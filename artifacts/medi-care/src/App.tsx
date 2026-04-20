@@ -1,40 +1,104 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import Navbar from "@/components/Navbar";
+
+import Landing from "@/pages/Landing";
+import CustomerLogin from "@/pages/CustomerLogin";
+import CustomerRegister from "@/pages/CustomerRegister";
+import AdminLogin from "@/pages/AdminLogin";
+import Store from "@/pages/Store";
+import Cart from "@/pages/Cart";
+import Orders from "@/pages/Orders";
+import Referrals from "@/pages/Referrals";
+import Chatbot from "@/pages/Chatbot";
+import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminCatalogue from "@/pages/admin/Catalogue";
+import AdminOrders from "@/pages/admin/Orders";
+import AdminCustomers from "@/pages/admin/Customers";
+import ChangePassword from "@/pages/admin/ChangePassword";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
-function Home() {
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Replit Agent is building...</h1>
-        <p className="mt-2 text-sm text-gray-600">Your app will appear here once it's ready.</p>
-      </div>
-    </div>
-  );
+function ProtectedCustomer({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Redirect to="/login" />;
+  if (user.role !== "customer") return <Redirect to="/admin" />;
+  return <>{children}</>;
 }
 
-function Router() {
+function ProtectedAdmin({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Redirect to="/admin-login" />;
+  if (user.role !== "admin") return <Redirect to="/store" />;
+  return <>{children}</>;
+}
+
+// Pages that don't need the shared navbar (they have their own)
+const NO_NAVBAR = ["/", "/login", "/register", "/admin-login"];
+
+function AppRouter() {
+  const [location] = useLocation();
+  const showNavbar = !NO_NAVBAR.includes(location);
+
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      {showNavbar && <Navbar />}
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route path="/login" component={CustomerLogin} />
+        <Route path="/register" component={CustomerRegister} />
+        <Route path="/admin-login" component={AdminLogin} />
+
+        <Route path="/store">
+          <ProtectedCustomer><Store /></ProtectedCustomer>
+        </Route>
+        <Route path="/cart">
+          <Cart />
+        </Route>
+        <Route path="/orders">
+          <ProtectedCustomer><Orders /></ProtectedCustomer>
+        </Route>
+        <Route path="/referrals">
+          <ProtectedCustomer><Referrals /></ProtectedCustomer>
+        </Route>
+        <Route path="/chat">
+          <Chatbot />
+        </Route>
+
+        <Route path="/admin">
+          <ProtectedAdmin><AdminDashboard /></ProtectedAdmin>
+        </Route>
+        <Route path="/admin/catalogue">
+          <ProtectedAdmin><AdminCatalogue /></ProtectedAdmin>
+        </Route>
+        <Route path="/admin/orders">
+          <ProtectedAdmin><AdminOrders /></ProtectedAdmin>
+        </Route>
+        <Route path="/admin/customers">
+          <ProtectedAdmin><AdminCustomers /></ProtectedAdmin>
+        </Route>
+        <Route path="/admin/change-password">
+          <ProtectedAdmin><ChangePassword /></ProtectedAdmin>
+        </Route>
+
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+      <AuthProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <AppRouter />
         </WouterRouter>
         <Toaster />
-      </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
