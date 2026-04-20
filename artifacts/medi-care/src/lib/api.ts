@@ -32,6 +32,7 @@ export const api = {
   },
   getCategories: () => apiFetch("/products/categories"),
   getProduct: (id: number) => apiFetch(`/products/${id}`),
+  getExpiryAlerts: (days?: number) => apiFetch(`/products/expiry-alerts${days ? `?days=${days}` : ""}`),
   createProduct: (body: any) => apiFetch("/products", { method: "POST", body: JSON.stringify(body) }),
   updateProduct: (id: number, body: any) => apiFetch(`/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteProduct: (id: number) => apiFetch(`/products/${id}`, { method: "DELETE" }),
@@ -43,6 +44,7 @@ export const api = {
     if (params?.status) q.set("status", params.status);
     return apiFetch(`/orders?${q}`);
   },
+  getOrder: (id: number) => apiFetch(`/orders/${id}`),
   createOrder: (body: any) => apiFetch("/orders", { method: "POST", body: JSON.stringify(body) }),
   updateOrderStatus: (id: number, body: any) => apiFetch(`/orders/${id}/status`, { method: "PUT", body: JSON.stringify(body) }),
 
@@ -58,4 +60,19 @@ export const api = {
   // Admin
   getDashboard: () => apiFetch("/admin/dashboard"),
   getCustomers: () => apiFetch("/admin/customers"),
+
+  // Family Members
+  getFamily: (customerId: number) => apiFetch(`/family?customerId=${customerId}`),
+  addFamilyMember: (body: any) => apiFetch("/family", { method: "POST", body: JSON.stringify(body) }),
+  updateFamilyMember: (id: number, body: any) => apiFetch(`/family/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteFamilyMember: (id: number) => apiFetch(`/family/${id}`, { method: "DELETE" }),
+
+  // Health Records
+  getHealthRecords: (customerId: number, familyMemberId?: number) => {
+    const q = new URLSearchParams({ customerId: String(customerId) });
+    if (familyMemberId) q.set("familyMemberId", String(familyMemberId));
+    return apiFetch(`/health-records?${q}`);
+  },
+  addHealthRecord: (body: any) => apiFetch("/health-records", { method: "POST", body: JSON.stringify(body) }),
+  deleteHealthRecord: (id: number) => apiFetch(`/health-records/${id}`, { method: "DELETE" }),
 };

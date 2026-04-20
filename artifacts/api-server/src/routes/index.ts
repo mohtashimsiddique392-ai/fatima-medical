@@ -6,6 +6,8 @@ import ordersRouter from "./orders";
 import referralsRouter from "./referrals";
 import chatRouter from "./chat";
 import adminRouter from "./admin";
+import familyRouter from "./family";
+import healthRecordsRouter from "./healthrecords";
 
 const router: IRouter = Router();
 
@@ -16,5 +18,7 @@ router.use("/orders", ordersRouter);
 router.use("/referrals", referralsRouter);
 router.use("/chat", chatRouter);
 router.use("/admin", adminRouter);
+router.use("/family", familyRouter);
+router.use("/health-records", healthRecordsRouter);
 
 export default router;

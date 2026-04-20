@@ -13,11 +13,14 @@ import Cart from "@/pages/Cart";
 import Orders from "@/pages/Orders";
 import Referrals from "@/pages/Referrals";
 import Chatbot from "@/pages/Chatbot";
+import FamilyMembers from "@/pages/FamilyMembers";
+import HealthRecords from "@/pages/HealthRecords";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminCatalogue from "@/pages/admin/Catalogue";
 import AdminOrders from "@/pages/admin/Orders";
 import AdminCustomers from "@/pages/admin/Customers";
 import ChangePassword from "@/pages/admin/ChangePassword";
+import ExpiryAlerts from "@/pages/admin/ExpiryAlerts";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -36,7 +39,6 @@ function ProtectedAdmin({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Pages that don't need the shared navbar (they have their own)
 const NO_NAVBAR = ["/", "/login", "/register", "/admin-login"];
 
 function AppRouter() {
@@ -67,6 +69,12 @@ function AppRouter() {
         <Route path="/chat">
           <Chatbot />
         </Route>
+        <Route path="/family">
+          <ProtectedCustomer><FamilyMembers /></ProtectedCustomer>
+        </Route>
+        <Route path="/health">
+          <ProtectedCustomer><HealthRecords /></ProtectedCustomer>
+        </Route>
 
         <Route path="/admin">
           <ProtectedAdmin><AdminDashboard /></ProtectedAdmin>
@@ -82,6 +90,9 @@ function AppRouter() {
         </Route>
         <Route path="/admin/change-password">
           <ProtectedAdmin><ChangePassword /></ProtectedAdmin>
+        </Route>
+        <Route path="/admin/expiry">
+          <ProtectedAdmin><ExpiryAlerts /></ProtectedAdmin>
         </Route>
 
         <Route component={NotFound} />

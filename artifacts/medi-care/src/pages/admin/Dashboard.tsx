@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Link } from "wouter";
-import { ShoppingBag, Users, Package, TrendingUp, AlertTriangle, Clock } from "lucide-react";
+import { ShoppingBag, Users, TrendingUp, AlertTriangle, Clock, AlertCircle } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700", confirmed: "bg-blue-100 text-blue-700",
@@ -22,6 +22,16 @@ export default function AdminDashboard() {
       <div className="max-w-5xl mx-auto">
         <h1 className="text-xl font-bold text-gray-900 mb-6">Dashboard</h1>
 
+        {/* Alert banners */}
+        {stats.expiringCount > 0 && (
+          <Link href="/admin/expiry">
+            <div className="mb-4 bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-orange-100 transition-colors">
+              <AlertCircle size={18} className="text-orange-500 flex-shrink-0" />
+              <p className="text-sm text-orange-700 font-medium">{stats.expiringCount} products expiring within 30 days — <span className="underline">View Expiry Alerts</span></p>
+            </div>
+          </Link>
+        )}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
             { icon: ShoppingBag, label: "Total Orders", value: stats.totalOrders, color: "text-blue-600", bg: "bg-blue-50" },
@@ -37,7 +47,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <div className="grid md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl border border-gray-100 p-4">
             <p className="text-sm text-gray-500">Today's Revenue</p>
             <p className="text-2xl font-bold text-teal-600 mt-1">₹{Number(stats.todayRevenue).toFixed(0)}</p>
@@ -47,12 +57,21 @@ export default function AdminDashboard() {
             <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalProducts}</p>
           </div>
           <div className={`rounded-xl border p-4 ${stats.lowStockProducts > 0 ? "bg-orange-50 border-orange-200" : "bg-white border-gray-100"}`}>
-            <div className="flex items-center gap-2">
-              {stats.lowStockProducts > 0 && <AlertTriangle size={16} className="text-orange-500" />}
+            <div className="flex items-center gap-1.5">
+              {stats.lowStockProducts > 0 && <AlertTriangle size={14} className="text-orange-500" />}
               <p className="text-sm text-gray-500">Low Stock</p>
             </div>
             <p className={`text-2xl font-bold mt-1 ${stats.lowStockProducts > 0 ? "text-orange-600" : "text-gray-900"}`}>{stats.lowStockProducts}</p>
           </div>
+          <Link href="/admin/expiry">
+            <div className={`rounded-xl border p-4 cursor-pointer ${stats.expiringCount > 0 ? "bg-red-50 border-red-200 hover:bg-red-100" : "bg-white border-gray-100"}`}>
+              <div className="flex items-center gap-1.5">
+                {stats.expiringCount > 0 && <AlertCircle size={14} className="text-red-500" />}
+                <p className="text-sm text-gray-500">Expiring Soon</p>
+              </div>
+              <p className={`text-2xl font-bold mt-1 ${stats.expiringCount > 0 ? "text-red-600" : "text-gray-900"}`}>{stats.expiringCount}</p>
+            </div>
+          </Link>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 p-4">

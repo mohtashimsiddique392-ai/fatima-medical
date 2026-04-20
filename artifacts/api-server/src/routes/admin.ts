@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { ordersTable, orderItemsTable, productsTable, customersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -17,6 +17,12 @@ router.get("/dashboard", async (_req, res) => {
   const todayRevenue = orders.filter(o => new Date(o.createdAt) >= today && o.status !== "cancelled").reduce((sum, o) => sum + Number(o.totalAmount), 0);
   const pendingOrders = orders.filter(o => o.status === "pending").length;
   const lowStockProducts = products.filter(p => p.stock < 10).length;
+
+  // Expiry alerts within 30 days
+  const todayStr = new Date().toISOString().split("T")[0];
+  const soon = new Date(); soon.setDate(soon.getDate() + 30);
+  const soonStr = soon.toISOString().split("T")[0];
+  const expiringProducts = products.filter(p => p.expiryDate && p.expiryDate <= soonStr);
 
   const recentOrders = await Promise.all(
     orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5).map(async (order) => {
@@ -34,6 +40,7 @@ router.get("/dashboard", async (_req, res) => {
     totalCustomers: customers.length,
     totalProducts: products.length,
     lowStockProducts,
+    expiringCount: expiringProducts.length,
     recentOrders,
   });
 });
