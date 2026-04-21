@@ -1,19 +1,39 @@
 {
   "name": "Fatima Medical Store",
-  "short_name": "Fatima Medical",
-  "description": "Fatima Medical Store - Order medicines online from Sector O, Lucknow. Quick delivery, UPI & COD payment.",
+  "short_name": "Medicos",
+  "description": "Fatima Medical Store - Order medicines online from Sector O, Lucknow. Quick delivery, UPI &amp; COD payment.",
   "id": "/",
-  "start_url": "/",
+  "start_url": "https://screenshot-steps--mohtashimsiddi1.replit.app/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#14b8a6",
   "lang": "en-IN",
-  "categories": ["medical", "health", "shopping"],
+  "categories": [
+    "medical",
+    "health",
+    "shopping"
+  ],
   "icons": [
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "screenshots": [
     {
@@ -30,5 +50,12 @@
       "form_factor": "narrow",
       "label": "Fatima Medical Store - Mobile View"
     }
-  ]
+  ],
+  "dir": "auto",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "iarc_rating_id": "12",
+  "prefer_related_applications": false
 }
