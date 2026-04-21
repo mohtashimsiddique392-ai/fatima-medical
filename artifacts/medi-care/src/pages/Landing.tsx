@@ -36,9 +36,14 @@ export default function Landing() {
             فاطیما میڈیکل اسٹور — order medicines, upload prescriptions, and consult our pharmacist online.
           </p>
           <p className="text-gray-500 mb-2">We deliver authentic medicines quickly and safely around Mansarovar Yojna, Lucknow.</p>
-          <div className="flex items-center justify-center gap-6 text-sm text-gray-500 mb-8">
-            <span className="flex items-center gap-1.5"><MapPin size={14} className="text-teal-500" /> Sector O, Lucknow 226008</span>
-            <span className="flex items-center gap-1.5"><Phone size={14} className="text-teal-500" /> +91 8081176774</span>
+          <div className="flex items-center justify-center gap-6 text-sm text-gray-500 mb-8 flex-wrap">
+            <a href="https://www.google.com/maps/search/?api=1&query=Fatima+Medical+Store+Sector+O+Mansarovar+Yojna+Lucknow+226008" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 hover:text-teal-600 active:scale-95 transition cursor-pointer">
+              <MapPin size={14} className="text-teal-500" /> Sector O, Lucknow 226008
+            </a>
+            <a href="tel:+918081176774" className="flex items-center gap-1.5 hover:text-teal-600 active:scale-95 transition cursor-pointer">
+              <Phone size={14} className="text-teal-500" /> +91 8081176774
+            </a>
           </div>
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <Link href="/register">

@@ -8,6 +8,7 @@ import chatRouter from "./chat";
 import adminRouter from "./admin";
 import familyRouter from "./family";
 import healthRecordsRouter from "./healthrecords";
+import otpRouter from "./otp";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use("/chat", chatRouter);
 router.use("/admin", adminRouter);
 router.use("/family", familyRouter);
 router.use("/health-records", healthRecordsRouter);
+router.use("/otp", otpRouter);
 
 export default router;
