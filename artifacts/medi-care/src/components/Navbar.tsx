@@ -1,14 +1,24 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShoppingCart, LogOut, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { ShoppingCart, LogOut, Menu, X, User, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 
 export default function Navbar() {
   const { user, logout, cartCount } = useAuth();
   const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
-  const handleLogout = () => { logout(); navigate("/"); };
+  const handleLogout = () => { logout(); setProfileOpen(false); navigate("/"); };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   return (
     <nav className="bg-white border-b border-teal-100 sticky top-0 z-50 shadow-sm">
@@ -40,7 +50,6 @@ export default function Navbar() {
             <Link href="/admin/expiry"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Expiry Alerts</span></Link>
             <Link href="/admin/orders"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Orders</span></Link>
             <Link href="/admin/customers"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Customers</span></Link>
-            <Link href="/admin/change-password"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Password</span></Link>
           </div>
         )}
 
@@ -56,12 +65,43 @@ export default function Navbar() {
             </Link>
           )}
           {user ? (
-            <div className="flex items-center gap-2">
-              <span className="hidden lg:block text-sm text-gray-600 font-medium truncate max-w-28">{user.name || user.username}</span>
-              <button onClick={handleLogout} className="flex items-center gap-1 text-sm text-red-500 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50">
-                <LogOut size={16} />
-                <span className="hidden md:block">Logout</span>
+            <div className="relative" ref={profileRef}>
+              <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-1.5 text-sm text-gray-700 hover:text-teal-600 px-2 py-1.5 rounded-lg hover:bg-teal-50">
+                <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center">
+                  <User size={15} className="text-teal-600" />
+                </div>
+                <span className="hidden sm:block font-medium truncate max-w-28">{user.name || user.username}</span>
+                <ChevronDown size={14} className="hidden sm:block text-gray-400" />
               </button>
+              {profileOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{user.name || user.username}</p>
+                    <p className="text-xs text-gray-500 truncate">{user.phone || (user.role === "admin" ? "Administrator" : "")}</p>
+                  </div>
+                  {user.role === "customer" && (
+                    <>
+                      <Link href="/family" onClick={() => setProfileOpen(false)}>
+                        <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer">Family Members</div>
+                      </Link>
+                      <Link href="/health" onClick={() => setProfileOpen(false)}>
+                        <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer">Health Records</div>
+                      </Link>
+                      <Link href="/referrals" onClick={() => setProfileOpen(false)}>
+                        <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer">Rewards</div>
+                      </Link>
+                    </>
+                  )}
+                  {user.role === "admin" && (
+                    <Link href="/admin/change-password" onClick={() => setProfileOpen(false)}>
+                      <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer">Change Password</div>
+                    </Link>
+                  )}
+                  <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-100">
+                    <LogOut size={14} /> Log out
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2">

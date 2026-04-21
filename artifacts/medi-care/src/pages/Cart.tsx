@@ -11,7 +11,6 @@ export default function Cart() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState<"cart" | "checkout">("cart");
-  const [success, setSuccess] = useState(false);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,34 +26,12 @@ export default function Cart() {
         useReferralCredits: form.useCredits,
       });
       clearCart();
-      setSuccess(true);
+      window.history.replaceState(null, "", "/orders");
+      navigate("/orders?placed=1", { replace: true });
     } catch (err: any) {
       setError(err.message);
     } finally { setLoading(false); }
   };
-
-  if (success) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl p-8 text-center max-w-sm w-full border border-teal-100 shadow-sm">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl">✓</span>
-        </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Order Placed!</h2>
-        <p className="text-gray-500 text-sm mb-2">Your order has been placed successfully.</p>
-        {form.paymentMethod === "upi" && (
-          <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-4 text-left">
-            <p className="text-sm font-semibold text-teal-800">Pay via UPI</p>
-            <p className="text-lg font-mono font-bold text-teal-600 mt-1">8081176774@okbizaxis</p>
-            <p className="text-xs text-teal-600 mt-1">Amount: ₹{cartTotal.toFixed(2)}</p>
-          </div>
-        )}
-        <div className="flex gap-2 mt-4">
-          <Link href="/orders"><button className="flex-1 bg-teal-500 text-white py-2.5 rounded-lg text-sm font-medium">View Orders</button></Link>
-          <Link href="/store"><button className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm text-gray-600">Continue Shopping</button></Link>
-        </div>
-      </div>
-    </div>
-  );
 
   if (cart.length === 0) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">

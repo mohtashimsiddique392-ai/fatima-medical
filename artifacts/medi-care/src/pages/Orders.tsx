@@ -1,8 +1,62 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { Package, Printer } from "lucide-react";
+import { Package, Printer, CheckCircle2, Smartphone } from "lucide-react";
 import { Link } from "wouter";
+
+function PayModal({ order, onClose, onPaid }: { order: any; onClose: () => void; onPaid: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const amount = Number(order.totalAmount).toFixed(2);
+  const upiId = "8081176774@okbizaxis";
+  const note = `Order #FM-${String(order.id).padStart(4, "0")}`;
+  const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent("Fatima Medical Store")}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
+
+  const apps = [
+    { name: "Google Pay", scheme: `tez://upi/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent("Fatima Medical Store")}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`, color: "bg-blue-500", short: "GPay" },
+    { name: "PhonePe", scheme: `phonepe://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent("Fatima Medical Store")}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`, color: "bg-purple-600", short: "PhonePe" },
+    { name: "Paytm", scheme: `paytmmp://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent("Fatima Medical Store")}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`, color: "bg-sky-500", short: "Paytm" },
+    { name: "Any UPI App", scheme: upiUrl, color: "bg-teal-500", short: "UPI" },
+  ];
+
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      await api.updateOrderStatus(order.id, { paymentStatus: "paid" });
+      onPaid();
+    } finally { setConfirming(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <div className="text-center mb-5">
+          <div className="w-14 h-14 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Smartphone size={26} className="text-teal-600" />
+          </div>
+          <h3 className="font-bold text-gray-900 text-lg">Pay ₹{amount}</h3>
+          <p className="text-xs text-gray-500 mt-1">Order #FM-{String(order.id).padStart(4, "0")}</p>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3 mb-4 text-center">
+          <p className="text-xs text-gray-500">Paying to</p>
+          <p className="font-mono font-bold text-gray-900 text-sm mt-0.5">{upiId}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Fatima Medical Store</p>
+        </div>
+        <p className="text-xs text-gray-600 font-medium mb-2">Choose payment app</p>
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          {apps.map(app => (
+            <a key={app.name} href={app.scheme} className={`${app.color} text-white text-sm font-medium py-3 rounded-xl text-center hover:opacity-90 active:scale-95 transition`}>
+              {app.short}
+            </a>
+          ))}
+        </div>
+        <button onClick={handleConfirm} disabled={confirming} className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+          <CheckCircle2 size={17} /> {confirming ? "Confirming..." : "I have paid"}
+        </button>
+        <button onClick={onClose} className="w-full mt-2 text-sm text-gray-500 py-2">Cancel</button>
+      </div>
+    </div>
+  );
+}
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700", confirmed: "bg-blue-100 text-blue-700",
@@ -130,10 +184,21 @@ export default function Orders() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [printOrder, setPrintOrder] = useState<any | null>(null);
+  const [payOrder, setPayOrder] = useState<any | null>(null);
+  const [justPlaced, setJustPlaced] = useState(false);
 
-  useEffect(() => {
+  const refreshOrders = () => {
     if (!user?.id) return;
     api.getOrders({ customerId: user.id }).then(r => { setOrders(r.orders); setLoading(false); });
+  };
+
+  useEffect(() => {
+    refreshOrders();
+    if (typeof window !== "undefined" && window.location.search.includes("placed=1")) {
+      setJustPlaced(true);
+      window.history.replaceState(null, "", "/orders");
+      setTimeout(() => setJustPlaced(false), 5000);
+    }
   }, [user?.id]);
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-gray-400">Loading orders...</div></div>;
@@ -152,6 +217,15 @@ export default function Orders() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-6">
       <div className="max-w-2xl mx-auto">
+        {justPlaced && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+            <CheckCircle2 size={22} className="text-green-600 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-green-800 text-sm">Order placed successfully!</p>
+              <p className="text-xs text-green-700">Once the store confirms your order, you can pay using UPI from below.</p>
+            </div>
+          </div>
+        )}
         <h1 className="text-xl font-bold text-gray-900 mb-6">My Orders</h1>
         <div className="space-y-4">
           {orders.map(order => (
@@ -183,9 +257,20 @@ export default function Orders() {
                 </div>
                 <p className="font-bold text-gray-900">₹{Number(order.totalAmount).toFixed(2)}</p>
               </div>
-              {order.paymentMethod === "upi" && order.paymentStatus === "pending" && (
-                <div className="mt-3 bg-teal-50 border border-teal-200 rounded-lg p-3">
-                  <p className="text-xs text-teal-700 font-medium">Pay via UPI: <span className="font-mono font-bold">8081176774@okbizaxis</span></p>
+              {order.paymentMethod === "upi" && order.paymentStatus === "pending" && order.status === "pending" && (
+                <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-xs text-yellow-700 font-medium">Waiting for store to confirm your order. Pay button will appear once confirmed.</p>
+                </div>
+              )}
+              {order.paymentMethod === "upi" && order.paymentStatus === "pending" && order.status !== "pending" && order.status !== "cancelled" && (
+                <div className="mt-3 bg-teal-50 border border-teal-200 rounded-lg p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-teal-700 font-medium">Order confirmed! Complete your UPI payment</p>
+                    <p className="text-xs text-teal-600 mt-0.5 font-mono">8081176774@okbizaxis</p>
+                  </div>
+                  <button onClick={() => setPayOrder(order)} className="bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 flex-shrink-0">
+                    <Smartphone size={14} /> Pay Now
+                  </button>
                 </div>
               )}
             </div>
@@ -193,6 +278,7 @@ export default function Orders() {
         </div>
       </div>
       {printOrder && <BillModal order={printOrder} customer={{ name: user?.name, phone: user?.phone }} onClose={() => setPrintOrder(null)} />}
+      {payOrder && <PayModal order={payOrder} onClose={() => setPayOrder(null)} onPaid={() => { setPayOrder(null); refreshOrders(); }} />}
     </div>
   );
 }
