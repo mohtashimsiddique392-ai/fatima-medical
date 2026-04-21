@@ -23,6 +23,15 @@ export const api = {
   customerRegister: (body: { name: string; phone: string; password: string; referralCode?: string }) =>
     apiFetch("/auth/customer/register", { method: "POST", body: JSON.stringify(body) }),
 
+  // Firebase OTP gating
+  otpCheckAllowed: (phone: string) =>
+    apiFetch("/otp/check-allowed", { method: "POST", body: JSON.stringify({ phone }) }),
+  otpRecordFailure: (phone: string) =>
+    apiFetch("/otp/record-failure", { method: "POST", body: JSON.stringify({ phone }) }),
+  otpVerifyToken: (idToken: string, phone: string) =>
+    apiFetch("/otp/verify-token", { method: "POST", body: JSON.stringify({ idToken, phone }) }),
+  otpStatus: (phone: string) => apiFetch(`/otp/status?phone=${encodeURIComponent(phone)}`),
+
   // Products
   getProducts: (params?: { category?: string; search?: string }) => {
     const q = new URLSearchParams();
