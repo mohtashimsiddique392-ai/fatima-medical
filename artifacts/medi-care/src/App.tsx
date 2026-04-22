@@ -25,15 +25,19 @@ import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
+// Shows a blank screen for one frame while localStorage is read,
+// preventing a flash-redirect to /login on refresh or back-navigation.
 function ProtectedCustomer({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
   if (!user) return <Redirect to="/login" />;
   if (user.role !== "customer") return <Redirect to="/admin" />;
   return <>{children}</>;
 }
 
 function ProtectedAdmin({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
   if (!user) return <Redirect to="/admin-login" />;
   if (user.role !== "admin") return <Redirect to="/store" />;
   return <>{children}</>;

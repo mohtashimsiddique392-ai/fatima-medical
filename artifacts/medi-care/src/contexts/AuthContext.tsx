@@ -22,6 +22,7 @@ interface CartItem {
 interface AuthContextType {
   user: User | null;
   cart: CartItem[];
+  isLoading: boolean;
   login: (user: User) => void;
   logout: () => void;
   addToCart: (item: Omit<CartItem, "quantity">) => void;
@@ -35,18 +36,31 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // isLoading stays true for one render cycle, preventing ProtectedRoute
+  // from redirecting before localStorage has been read.
+  const [isLoading, setIsLoading] = useState(true);
+
   const [user, setUser] = useState<User | null>(() => {
     try { return JSON.parse(localStorage.getItem("mc_user") || "null"); } catch { return null; }
   });
+
   const [cart, setCart] = useState<CartItem[]>(() => {
     try { return JSON.parse(localStorage.getItem("mc_cart") || "[]"); } catch { return []; }
   });
+
+  // Mark loading done after first render (localStorage is already read above synchronously)
+  useEffect(() => { setIsLoading(false); }, []);
 
   useEffect(() => { localStorage.setItem("mc_user", JSON.stringify(user)); }, [user]);
   useEffect(() => { localStorage.setItem("mc_cart", JSON.stringify(cart)); }, [cart]);
 
   const login = (u: User) => setUser(u);
-  const logout = () => { setUser(null); setCart([]); localStorage.removeItem("mc_user"); localStorage.removeItem("mc_cart"); };
+  const logout = () => {
+    setUser(null);
+    setCart([]);
+    localStorage.removeItem("mc_user");
+    localStorage.removeItem("mc_cart");
+  };
 
   const addToCart = (item: Omit<CartItem, "quantity">) => {
     setCart(prev => {
@@ -66,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cartCount = cart.reduce((s, c) => s + c.quantity, 0);
 
   return (
-    <AuthContext.Provider value={{ user, cart, login, logout, addToCart, removeFromCart, updateQty, clearCart, cartTotal, cartCount }}>
+    <AuthContext.Provider value={{ user, cart, isLoading, login, logout, addToCart, removeFromCart, updateQty, clearCart, cartTotal, cartCount }}>
       {children}
     </AuthContext.Provider>
   );
