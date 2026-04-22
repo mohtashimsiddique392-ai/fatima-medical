@@ -1,14 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 
 export default function CustomerLogin() {
-  const { login } = useAuth();
+  const { login, user, isLoading } = useAuth();
   const [, navigate] = useLocation();
   const [form, setForm] = useState({ phone: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate(user.role === "admin" ? "/admin" : "/store");
+    }
+  }, [user, isLoading]);
+
+  if (isLoading || user) return null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +40,6 @@ export default function CustomerLogin() {
           <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
           <p className="text-gray-500 text-sm mt-1">Sign in to your Fatima Medical account</p>
         </div>
-
         <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-6">
           <form onSubmit={submit} className="space-y-4">
             <div>

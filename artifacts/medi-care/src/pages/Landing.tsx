@@ -1,3 +1,21 @@
+// Landing.tsx - add this at the top
+import { useEffect } from "react";
+import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+
+export default function Landing() {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate(user.role === "admin" ? "/admin" : "/store");
+    }
+  }, [user, isLoading]);
+
+  if (isLoading || user) return null; // prevent flash of landing page
+
+  // ... rest of your existing return JSX unchanged
 import { Link } from "wouter";
 import { ShieldCheck, Truck, Heart, MapPin, Phone, Clock } from "lucide-react";
 
@@ -119,7 +137,7 @@ export default function Landing() {
       <footer className="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
         <p className="font-semibold text-white mb-1">Fatima Medical Store</p>
         <p>Sector O, Mansarovar Yojna, Lucknow 226008 | +91 8081176774</p>
-        <p className="mt-2">© 2024 Fatima Medical. All rights reserved.</p>
+        <p className="mt-2">© 2026 Fatima Medical. All rights reserved.</p>
       </footer>
     </div>
   );

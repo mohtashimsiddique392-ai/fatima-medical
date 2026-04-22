@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { Shield } from "lucide-react";
 
 export default function AdminLogin() {
-  const { login } = useAuth();
+  const { login, user, isLoading } = useAuth();
   const [, navigate] = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate(user.role === "admin" ? "/admin" : "/store");
+    }
+  }, [user, isLoading]);
+
+  if (isLoading || user) return null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +41,6 @@ export default function AdminLogin() {
           <h1 className="text-2xl font-bold text-white">Staff Login</h1>
           <p className="text-gray-400 text-sm mt-1">Fatima Medical Admin Panel</p>
         </div>
-
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <form onSubmit={submit} className="space-y-4">
             <div>
