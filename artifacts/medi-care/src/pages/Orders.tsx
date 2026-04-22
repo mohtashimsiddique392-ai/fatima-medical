@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { Package, Printer, CheckCircle2, Smartphone } from "lucide-react";
+import { Package, Printer, CheckCircle2, Smartphone, Clock } from "lucide-react";
 import { Link } from "wouter";
 
-function PayModal({ order, onClose, onPaid }: { order: any; onClose: () => void; onPaid: () => void }) {
-  const [confirming, setConfirming] = useState(false);
+function PayModal({ order, onClose }: { order: any; onClose: () => void }) {
+  const [launched, setLaunched] = useState(false);
   const amount = Number(order.totalAmount).toFixed(2);
   const upiId = "8081176774@okbizaxis";
   const note = `Order #FM-${String(order.id).padStart(4, "0")}`;
@@ -18,14 +18,6 @@ function PayModal({ order, onClose, onPaid }: { order: any; onClose: () => void;
     { name: "Any UPI App", scheme: upiUrl, color: "bg-teal-500", short: "UPI" },
   ];
 
-  const handleConfirm = async () => {
-    setConfirming(true);
-    try {
-      await api.updateOrderStatus(order.id, { paymentStatus: "paid" });
-      onPaid();
-    } finally { setConfirming(false); }
-  };
-
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
@@ -36,23 +28,39 @@ function PayModal({ order, onClose, onPaid }: { order: any; onClose: () => void;
           <h3 className="font-bold text-gray-900 text-lg">Pay ₹{amount}</h3>
           <p className="text-xs text-gray-500 mt-1">Order #FM-{String(order.id).padStart(4, "0")}</p>
         </div>
+
         <div className="bg-gray-50 rounded-xl p-3 mb-4 text-center">
           <p className="text-xs text-gray-500">Paying to</p>
           <p className="font-mono font-bold text-gray-900 text-sm mt-0.5">{upiId}</p>
           <p className="text-xs text-gray-500 mt-0.5">Fatima Medical Store</p>
         </div>
+
         <p className="text-xs text-gray-600 font-medium mb-2">Choose payment app</p>
         <div className="grid grid-cols-2 gap-2 mb-5">
           {apps.map(app => (
-            <a key={app.name} href={app.scheme} className={`${app.color} text-white text-sm font-medium py-3 rounded-xl text-center hover:opacity-90 active:scale-95 transition`}>
+            <a
+              key={app.name}
+              href={app.scheme}
+              onClick={() => setLaunched(true)}
+              className={`${app.color} text-white text-sm font-medium py-3 rounded-xl text-center hover:opacity-90 active:scale-95 transition`}
+            >
               {app.short}
             </a>
           ))}
         </div>
-        <button onClick={handleConfirm} disabled={confirming} className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2">
-          <CheckCircle2 size={17} /> {confirming ? "Confirming..." : "I have paid"}
+
+        {launched && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex items-start gap-2">
+            <Clock size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-700">
+              Once your payment goes through, the store will verify and mark your order as paid. This may take a few minutes.
+            </p>
+          </div>
+        )}
+
+        <button onClick={onClose} className="w-full text-sm text-gray-500 py-2 border border-gray-200 rounded-xl">
+          Close
         </button>
-        <button onClick={onClose} className="w-full mt-2 text-sm text-gray-500 py-2">Cancel</button>
       </div>
     </div>
   );
@@ -253,24 +261,41 @@ export default function Orders() {
                   <span className={`text-xs px-2 py-0.5 rounded font-medium ${order.paymentMethod === "upi" ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-600"}`}>
                     {order.paymentMethod === "upi" ? "UPI" : "Cash on Delivery"}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded font-medium capitalize ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{order.paymentStatus}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded font-medium capitalize ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                    {order.paymentStatus === "paid" ? "✓ Paid" : order.paymentStatus}
+                  </span>
                 </div>
                 <p className="font-bold text-gray-900">₹{Number(order.totalAmount).toFixed(2)}</p>
               </div>
+
+              {/* Waiting for confirmation */}
               {order.paymentMethod === "upi" && order.paymentStatus === "pending" && order.status === "pending" && (
                 <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-xs text-yellow-700 font-medium">Waiting for store to confirm your order. Pay button will appear once confirmed.</p>
+                  <p className="text-xs text-yellow-700 font-medium">⏳ Waiting for store to confirm your order. Pay button will appear once confirmed.</p>
                 </div>
               )}
+
+              {/* Pay Now — only shown after store confirms, before payment */}
               {order.paymentMethod === "upi" && order.paymentStatus === "pending" && order.status !== "pending" && order.status !== "cancelled" && (
                 <div className="mt-3 bg-teal-50 border border-teal-200 rounded-lg p-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs text-teal-700 font-medium">Order confirmed! Complete your UPI payment</p>
                     <p className="text-xs text-teal-600 mt-0.5 font-mono">8081176774@okbizaxis</p>
                   </div>
-                  <button onClick={() => setPayOrder(order)} className="bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => setPayOrder(order)}
+                    className="bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 flex-shrink-0"
+                  >
                     <Smartphone size={14} /> Pay Now
                   </button>
+                </div>
+              )}
+
+              {/* Paid confirmation message */}
+              {order.paymentMethod === "upi" && order.paymentStatus === "paid" && (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                  <CheckCircle2 size={15} className="text-green-600 flex-shrink-0" />
+                  <p className="text-xs text-green-700 font-medium">Payment confirmed by the store.</p>
                 </div>
               )}
             </div>
@@ -278,7 +303,7 @@ export default function Orders() {
         </div>
       </div>
       {printOrder && <BillModal order={printOrder} customer={{ name: user?.name, phone: user?.phone }} onClose={() => setPrintOrder(null)} />}
-      {payOrder && <PayModal order={payOrder} onClose={() => setPayOrder(null)} onPaid={() => { setPayOrder(null); refreshOrders(); }} />}
+      {payOrder && <PayModal order={payOrder} onClose={() => { setPayOrder(null); refreshOrders(); }} />}
     </div>
   );
 }
