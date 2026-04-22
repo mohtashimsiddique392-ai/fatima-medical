@@ -31,14 +31,14 @@
   ],
   "screenshots": [
     {
-      "src": "screenshot-wide.png",
+      "src": "https://screenshot-steps--mohtashimsiddi1.replit.app/screenshot-wide.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Fatima Medical Store - Desktop View"
     },
     {
-      "src": "screenshot-mobile.png",
+      "src": "https://screenshot-steps--mohtashimsiddi1.replit.app/screenshot-mobile.png",
       "sizes": "540x720",
       "type": "image/png",
       "form_factor": "narrow",
