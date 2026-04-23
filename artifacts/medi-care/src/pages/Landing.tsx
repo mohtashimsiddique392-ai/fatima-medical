@@ -1,7 +1,7 @@
-// Landing.tsx - add this at the top
 import { useEffect } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { ShieldCheck, Truck, Heart, MapPin, Phone } from "lucide-react";
 
 export default function Landing() {
   const { user, isLoading } = useAuth();
@@ -13,13 +13,8 @@ export default function Landing() {
     }
   }, [user, isLoading]);
 
-  if (isLoading || user) return null; // prevent flash of landing page
+  if (isLoading || user) return null;
 
-  // ... rest of your existing return JSX unchanged
-import { Link } from "wouter";
-import { ShieldCheck, Truck, Heart, MapPin, Phone, Clock } from "lucide-react";
-
-export default function Landing() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
