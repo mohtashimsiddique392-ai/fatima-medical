@@ -15,8 +15,13 @@ router.post("/", async (req, res) => {
     return res.status(500).json({ error: "Gemini API key not configured" });
   }
 
-  const products = await db.select().from(productsTable).where(eq(productsTable.isActive, true));
-  const productList = products.map(p => `- ${p.name} (₹${p.price}, category: ${p.category})`).join("\n");
+  const products = await db
+    .select()
+    .from(productsTable)
+    .where(eq(productsTable.isActive, true));
+  const productList = products
+    .map((p) => `- ${p.name} (₹${p.price}, category: ${p.category})`)
+    .join("\n");
 
   const systemPrompt = `You are a helpful medical and pharmacy assistant for Fatima Medical Store, Lucknow.
 
@@ -40,16 +45,19 @@ ${productList}
 If the user's health query matches any of our products, suggest them naturally at the end of your response in this exact format:
 SUGGEST_PRODUCTS: product name 1, product name 2`;
 
-  const chatHistory = (history || []).map((m: any) => ({
-    role: m.role === "bot" ? "model" : "user",
-    parts: [{ text: m.text }]
-  }));
+  // Filter out history items with empty text and fix roles
+  const chatHistory = (history || [])
+    .filter((m: any) => m.text && m.text.trim().length > 0)
+    .map((m: any) => ({
+      role: m.role === "bot" ? "model" : "user",
+      parts: [{ text: m.text.trim() }],
+    }));
 
   try {
-    console.log("Calling Gemini, key length:", apiKey.length, "history items:", chatHistory.length);
+    console.log("Calling Gemini, history items:", chatHistory.length);
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,26 +65,31 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [
             ...chatHistory,
-            { role: "user", parts: [{ text: message }] }
+            { role: "user", parts: [{ text: message }] },
           ],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 500 }
-        })
-      }
+          generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
+        }),
+      },
     );
 
     console.log("Gemini status:", response.status);
     const data = await response.json();
-    console.log("Gemini response:", JSON.stringify(data).slice(0, 800));
 
     if (!response.ok) {
-      console.error("Gemini error body:", JSON.stringify(data));
-      return res.status(500).json({ error: data.error?.message || "Gemini error " + response.status });
+      console.error("Gemini error:", JSON.stringify(data));
+      return res
+        .status(500)
+        .json({
+          error: data.error?.message || "Gemini error " + response.status,
+        });
     }
 
     let reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    console.log("Extracted reply:", reply?.slice(0, 100));
-
     if (!reply) {
+      console.error(
+        "No reply in response:",
+        JSON.stringify(data).slice(0, 300),
+      );
       reply = "Sorry, I could not process that. Please try again.";
     }
 
@@ -84,10 +97,12 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
     if (reply.includes("SUGGEST_PRODUCTS:")) {
       const parts = reply.split("SUGGEST_PRODUCTS:");
       reply = parts[0].trim();
-      const names = parts[1].split(",").map((n: string) => n.trim().toLowerCase());
-      suggestedProducts = products.filter(p =>
-        names.some(n => p.name.toLowerCase().includes(n))
-      ).slice(0, 3);
+      const names = parts[1]
+        .split(",")
+        .map((n: string) => n.trim().toLowerCase());
+      suggestedProducts = products
+        .filter((p) => names.some((n) => p.name.toLowerCase().includes(n)))
+        .slice(0, 3);
     }
 
     res.json({ reply, suggestedProducts });
