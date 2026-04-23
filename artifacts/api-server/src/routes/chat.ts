@@ -46,7 +46,7 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
   }));
 
   try {
-    console.log("Calling Gemini API with key length:", apiKey.length);
+    console.log("Calling Gemini, key length:", apiKey.length, "history items:", chatHistory.length);
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -64,20 +64,19 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
       }
     );
 
-    console.log("Gemini HTTP status:", response.status);
+    console.log("Gemini status:", response.status);
     const data = await response.json();
-    console.log("Gemini raw response:", JSON.stringify(data).slice(0, 500));
+    console.log("Gemini response:", JSON.stringify(data).slice(0, 800));
 
     if (!response.ok) {
-      console.error("Gemini API error:", JSON.stringify(data));
-      return res.status(500).json({
-        error: data.error?.message || "Gemini API returned error: " + response.status
-      });
+      console.error("Gemini error body:", JSON.stringify(data));
+      return res.status(500).json({ error: data.error?.message || "Gemini error " + response.status });
     }
 
     let reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    console.log("Extracted reply:", reply?.slice(0, 100));
+
     if (!reply) {
-      console.error("No reply in Gemini response:", JSON.stringify(data));
       reply = "Sorry, I could not process that. Please try again.";
     }
 
@@ -93,8 +92,8 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
 
     res.json({ reply, suggestedProducts });
   } catch (err: any) {
-    console.error("Chat route exception:", err.message, err.stack);
-    res.status(500).json({ error: "Failed to get response: " + err.message });
+    console.error("Chat exception:", err.message);
+    res.status(500).json({ error: "Failed: " + err.message });
   }
 });
 
