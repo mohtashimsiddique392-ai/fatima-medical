@@ -10,9 +10,11 @@ router.post("/", async (req, res) => {
   if (!message) return res.status(400).json({ error: "Message required" });
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "Gemini API key not configured" });
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is not set");
+    return res.status(500).json({ error: "Gemini API key not configured" });
+  }
 
-  // Fetch active products to give context
   const products = await db.select().from(productsTable).where(eq(productsTable.isActive, true));
   const productList = products.map(p => `- ${p.name} (₹${p.price}, category: ${p.category})`).join("\n");
 
@@ -44,6 +46,8 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
   }));
 
   try {
+    console.log("Calling Gemini API with key length:", apiKey.length);
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
@@ -60,10 +64,23 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
       }
     );
 
+    console.log("Gemini HTTP status:", response.status);
     const data = await response.json();
-    let reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I could not process that. Please try again.";
+    console.log("Gemini raw response:", JSON.stringify(data).slice(0, 500));
 
-    // Extract product suggestions if Gemini included them
+    if (!response.ok) {
+      console.error("Gemini API error:", JSON.stringify(data));
+      return res.status(500).json({
+        error: data.error?.message || "Gemini API returned error: " + response.status
+      });
+    }
+
+    let reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!reply) {
+      console.error("No reply in Gemini response:", JSON.stringify(data));
+      reply = "Sorry, I could not process that. Please try again.";
+    }
+
     let suggestedProducts: any[] = [];
     if (reply.includes("SUGGEST_PRODUCTS:")) {
       const parts = reply.split("SUGGEST_PRODUCTS:");
@@ -76,6 +93,7 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
 
     res.json({ reply, suggestedProducts });
   } catch (err: any) {
+    console.error("Chat route exception:", err.message, err.stack);
     res.status(500).json({ error: "Failed to get response: " + err.message });
   }
 });
