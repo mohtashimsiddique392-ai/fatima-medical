@@ -40,7 +40,6 @@ ${productList}
 If the user's health query matches any of our products, suggest them naturally at the end of your response in this exact format:
 SUGGEST_PRODUCTS: product name 1, product name 2`;
 
-  // Build chat history for Groq format
   const chatHistory = (history || [])
     .filter((m: any) => m.text && m.text.trim().length > 0)
     .map((m: any) => ({
@@ -60,7 +59,7 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "llama3-8b-8192",
+          model: "llama-3.1-8b-instant",
           messages: [
             { role: "system", content: systemPrompt },
             ...chatHistory,
