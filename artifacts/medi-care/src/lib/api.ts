@@ -66,6 +66,10 @@ export const api = {
   chat: (body: { message: string; customerId?: number }) =>
     apiFetch("/chat", { method: "POST", body: JSON.stringify(body) }),
 
+  // Scan
+  scanImage: (body: { image: string; type: string }) =>
+    apiFetch("/scan", { method: "POST", body: JSON.stringify(body) }),
+
   // Admin
   getDashboard: () => apiFetch("/admin/dashboard"),
   getCustomers: () => apiFetch("/admin/customers"),

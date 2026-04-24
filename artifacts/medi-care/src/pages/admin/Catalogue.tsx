@@ -15,27 +15,6 @@ function expiryStatus(date?: string) {
   return null;
 }
 
-async function callGroqVision(base64Image: string, prompt: string): Promise<string> {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY || ""}`
-    },
-    body: JSON.stringify({
-      model: "llama-3.2-11b-vision-preview",
-      messages: [{ role: "user", content: [
-        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
-        { type: "text", text: prompt }
-      ]}],
-      max_tokens: 1000,
-      temperature: 0.2
-    })
-  });
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "";
-}
-
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -100,40 +79,25 @@ export default function AdminCatalogue() {
     if (bulkProducts.length <= 1) { setShowBulk(false); load(); }
   };
 
-  // Single product scan with camera or gallery
   const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     setAiProcessing(true);
     setScanMsg("AI is reading the medicine image…");
     try {
       const base64 = await fileToBase64(file);
-      const result = await callGroqVision(base64, `Look at this medicine/product image and extract details. Return ONLY a JSON object with these fields:
-{
-  "name": "full medicine name with strength",
-  "category": "one of: Pain Relief, Antibiotic, Allergy, Gastro, Diabetes, Vitamin, Syrup, Supplement, General",
-  "price": "estimated MRP number only",
-  "dosage": "dosage instructions",
-  "howToTake": "how to take",
-  "manufacturer": "manufacturer name if visible",
-  "batchNumber": "batch number if visible",
-  "expiryDate": "YYYY-MM-DD format if visible, else empty string",
-  "requiresPrescription": false,
-  "stock": 10
-}
-Return only the JSON, no other text.`);
-
-      try {
-        const clean = result.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(clean);
-        setForm(p => ({ ...p, ...parsed, price: String(parsed.price || ""), stock: parsed.stock || 10 }));
-        setScanMsg("✓ AI scan complete! Review details below and save.");
-        setShowForm(true);
-      } catch {
-        setScanMsg("Could not read image clearly. Please fill details manually.");
-        setShowForm(true);
-      }
+      const data = await api.scanImage({ image: base64, type: "single" });
+      const parsed = data.result;
+      setForm(p => ({
+        ...p,
+        ...parsed,
+        price: String(parsed.price || ""),
+        stock: Number(parsed.stock) || 10
+      }));
+      setScanMsg("✓ AI scan complete! Review details below and save.");
+      setShowForm(true);
     } catch (err) {
       setScanMsg("AI scan failed. Please try again or add manually.");
+      setShowForm(true);
     } finally {
       setAiProcessing(false);
       if (scanCameraRef.current) scanCameraRef.current.value = "";
@@ -141,7 +105,6 @@ Return only the JSON, no other text.`);
     }
   };
 
-  // Wholesaler bill image scan
   const handleBillImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     setBillImage(file);
@@ -151,70 +114,30 @@ Return only the JSON, no other text.`);
     if (billGalleryRef.current) billGalleryRef.current.value = "";
   };
 
-  // Process wholesaler bill (text or image)
   const parseBill = async () => {
     setAiProcessing(true);
     setScanMsg("AI is processing the wholesaler bill…");
     setShowWholesalerForm(false);
     try {
-      let result = "";
+      let parsed: any[];
 
       if (billMode === "image" && billImage) {
         const base64 = await fileToBase64(billImage);
-        result = await callGroqVision(base64, `This is a wholesaler/supplier medicine bill. Extract ALL medicines listed and return ONLY a JSON array like this:
-[
-  {
-    "name": "medicine name with strength",
-    "price": "price number only",
-    "stock": quantity as number,
-    "category": "Pain Relief/Antibiotic/Allergy/Gastro/Diabetes/Vitamin/Syrup/Supplement/General",
-    "batchNumber": "batch if visible",
-    "expiryDate": "YYYY-MM-DD if visible else empty string",
-    "manufacturer": "manufacturer if visible",
-    "dosage": "dosage if visible",
-    "requiresPrescription": false
-  }
-]
-Return only the JSON array, no other text.`);
+        const data = await api.scanImage({ image: base64, type: "bill" });
+        parsed = Array.isArray(data.result) ? data.result : [data.result];
       } else {
-        // Text bill — use Groq text model
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const res = await fetch("/api/scan/text", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY || ""}`
-          },
-          body: JSON.stringify({
-            model: "llama-3.1-8b-instant",
-            messages: [
-              { role: "system", content: "You are a pharmacy data extraction assistant. Extract medicine details from wholesaler bills and return only valid JSON." },
-              { role: "user", content: `Extract all medicines from this wholesaler bill and return ONLY a JSON array:
-[{"name":"","price":"","stock":0,"category":"","batchNumber":"","expiryDate":"","manufacturer":"","dosage":"","requiresPrescription":false}]
-
-Bill text:
-${billText}
-
-Return only the JSON array, no explanation.` }
-            ],
-            max_tokens: 1000,
-            temperature: 0.1
-          })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: billText })
         });
         const data = await res.json();
-        result = data.choices?.[0]?.message?.content || "[]";
+        parsed = Array.isArray(data.result) ? data.result : [data.result];
       }
 
-      try {
-        const clean = result.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(clean);
-        const arr = Array.isArray(parsed) ? parsed : [parsed];
-        setBulkProducts(arr);
-        setShowBulk(true);
-        setScanMsg(`✓ Found ${arr.length} products from bill. Review and save each one.`);
-      } catch {
-        setScanMsg("Could not parse bill. Try pasting the text manually.");
-        setShowWholesalerForm(true);
-      }
+      setBulkProducts(parsed);
+      setShowBulk(true);
+      setScanMsg(`✓ Found ${parsed.length} products from bill. Review and save each one.`);
     } catch (err) {
       setScanMsg("AI processing failed. Please try again.");
       setShowWholesalerForm(true);
@@ -234,19 +157,26 @@ Return only the JSON array, no explanation.` }
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold text-gray-900">Medicine Catalogue</h1>
           <div className="flex gap-2 flex-wrap justify-end">
-            <button onClick={() => { setBillMode("text"); setBillImage(null); setBillText(""); setShowWholesalerForm(true); }} className="flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium"><FileText size={15} /> Wholesaler Bill</button>
-
-            {/* Scan Photo — Camera + Gallery */}
+            <button onClick={() => { setBillMode("text"); setBillImage(null); setBillText(""); setShowWholesalerForm(true); }}
+              className="flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
+              <FileText size={15} /> Wholesaler Bill
+            </button>
             <div className="flex gap-1">
-              <button onClick={() => scanCameraRef.current?.click()} disabled={aiProcessing} className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white px-3 py-2 rounded-l-lg text-sm font-medium"><Camera size={15} /> Camera</button>
-              <button onClick={() => scanGalleryRef.current?.click()} disabled={aiProcessing} className="flex items-center gap-1.5 bg-purple-400 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-2 rounded-r-lg text-sm font-medium"><Image size={15} /> Gallery</button>
+              <button onClick={() => scanCameraRef.current?.click()} disabled={aiProcessing}
+                className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white px-3 py-2 rounded-l-lg text-sm font-medium">
+                <Camera size={15} /> Camera
+              </button>
+              <button onClick={() => scanGalleryRef.current?.click()} disabled={aiProcessing}
+                className="flex items-center gap-1.5 bg-purple-400 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-2 rounded-r-lg text-sm font-medium">
+                <Image size={15} /> Gallery
+              </button>
             </div>
-
-            {/* Hidden inputs for scan */}
             <input ref={scanCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScan} />
             <input ref={scanGalleryRef} type="file" accept="image/*" className="hidden" onChange={handleScan} />
-
-            <button onClick={openNew} className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded-lg text-sm font-medium"><Plus size={15} /> Add Product</button>
+            <button onClick={openNew}
+              className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
+              <Plus size={15} /> Add Product
+            </button>
           </div>
         </div>
 
@@ -256,7 +186,8 @@ Return only the JSON array, no explanation.` }
               <AlertTriangle size={16} className="text-orange-500" />
               <span className="text-sm text-orange-700 font-medium">{expiringProducts.length} products expiring within 90 days</span>
             </div>
-            <button onClick={() => setExpiryFilter(!expiryFilter)} className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-all ${expiryFilter ? "bg-orange-500 text-white border-orange-500" : "bg-white text-orange-600 border-orange-300"}`}>
+            <button onClick={() => setExpiryFilter(!expiryFilter)}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-all ${expiryFilter ? "bg-orange-500 text-white border-orange-500" : "bg-white text-orange-600 border-orange-300"}`}>
               {expiryFilter ? "Show All" : "Show Expiring"}
             </button>
           </div>
@@ -275,7 +206,6 @@ Return only the JSON array, no explanation.` }
           </div>
         )}
 
-        {/* Bulk products from bill */}
         {showBulk && bulkProducts.length > 0 && (
           <div className="mb-4 bg-white rounded-xl border border-indigo-200 p-4">
             <h3 className="font-semibold text-gray-900 mb-3">Products from Wholesaler Bill — Review & Save</h3>
@@ -287,12 +217,17 @@ Return only the JSON array, no explanation.` }
                     <p className="text-xs text-gray-500">₹{p.price} · Stock: {p.stock} · {p.category} · Batch: {p.batchNumber} · Exp: {p.expiryDate || "—"}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setForm({ ...EMPTY, ...p, price: String(p.price), stock: Number(p.stock) }); setEditing(null); setBulkProducts(prev => prev.filter((_, j) => j !== i)); setShowForm(true); }} className="text-xs bg-white border border-indigo-300 text-indigo-600 px-2 py-1.5 rounded-lg"><Pencil size={12} /></button>
-                    <button onClick={() => saveBulkProduct(p, i)} className="text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-medium">Save</button>
+                    <button onClick={() => { setForm({ ...EMPTY, ...p, price: String(p.price), stock: Number(p.stock) }); setEditing(null); setBulkProducts(prev => prev.filter((_, j) => j !== i)); setShowForm(true); }}
+                      className="text-xs bg-white border border-indigo-300 text-indigo-600 px-2 py-1.5 rounded-lg">
+                      <Pencil size={12} />
+                    </button>
+                    <button onClick={() => saveBulkProduct(p, i)}
+                      className="text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-medium">Save</button>
                   </div>
                 </div>
               ))}
-              <button onClick={() => { setShowBulk(false); setBulkProducts([]); load(); }} className="text-xs text-gray-400 hover:text-gray-600">Dismiss remaining</button>
+              <button onClick={() => { setShowBulk(false); setBulkProducts([]); load(); }}
+                className="text-xs text-gray-400 hover:text-gray-600">Dismiss remaining</button>
             </div>
           </div>
         )}
@@ -300,7 +235,9 @@ Return only the JSON array, no explanation.` }
         <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>{["Name", "Category", "Price", "Stock", "Expiry", "Rx", "Actions"].map(h => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>)}</tr>
+              <tr>{["Name", "Category", "Price", "Stock", "Expiry", "Rx", "Actions"].map(h =>
+                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+              )}</tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {displayProducts.map(p => {
@@ -317,7 +254,9 @@ Return only the JSON array, no explanation.` }
                       <p className="font-semibold text-gray-900">₹{Number(p.price).toFixed(0)}</p>
                       {p.costPrice && <p className="text-xs text-gray-400">Cost: ₹{Number(p.costPrice).toFixed(0)}</p>}
                     </td>
-                    <td className="px-4 py-3"><span className={`font-medium ${p.stock <= 10 ? "text-orange-500" : "text-gray-700"}`}>{p.stock}</span></td>
+                    <td className="px-4 py-3">
+                      <span className={`font-medium ${p.stock <= 10 ? "text-orange-500" : "text-gray-700"}`}>{p.stock}</span>
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {p.expiryDate ? (
                         <div>
@@ -326,7 +265,9 @@ Return only the JSON array, no explanation.` }
                         </div>
                       ) : <span className="text-xs text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-3">{p.requiresPrescription ? <Check size={16} className="text-green-500" /> : <X size={16} className="text-gray-300" />}</td>
+                    <td className="px-4 py-3">
+                      {p.requiresPrescription ? <Check size={16} className="text-green-500" /> : <X size={16} className="text-gray-300" />}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button onClick={() => openEdit(p)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Pencil size={14} /></button>
@@ -336,13 +277,15 @@ Return only the JSON array, no explanation.` }
                   </tr>
                 );
               })}
-              {displayProducts.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No products to show.</td></tr>}
+              {displayProducts.length === 0 &&
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No products to show.</td></tr>
+              }
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Wholesaler Bill Form */}
+      {/* Wholesaler Bill Modal */}
       {showWholesalerForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
@@ -350,13 +293,13 @@ Return only the JSON array, no explanation.` }
               <h3 className="font-bold text-gray-900">Import from Wholesaler Bill</h3>
               <button onClick={() => setShowWholesalerForm(false)} className="text-gray-400"><X size={20} /></button>
             </div>
-
-            {/* Mode toggle */}
             <div className="flex gap-2 mb-4">
-              <button onClick={() => setBillMode("text")} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${billMode === "text" ? "bg-indigo-500 text-white border-indigo-500" : "bg-white text-gray-600 border-gray-200"}`}>
+              <button onClick={() => setBillMode("text")}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${billMode === "text" ? "bg-indigo-500 text-white border-indigo-500" : "bg-white text-gray-600 border-gray-200"}`}>
                 📝 Paste Text
               </button>
-              <button onClick={() => setBillMode("image")} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${billMode === "image" ? "bg-indigo-500 text-white border-indigo-500" : "bg-white text-gray-600 border-gray-200"}`}>
+              <button onClick={() => setBillMode("image")}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${billMode === "image" ? "bg-indigo-500 text-white border-indigo-500" : "bg-white text-gray-600 border-gray-200"}`}>
                 📷 Photo of Bill
               </button>
             </div>
@@ -372,10 +315,12 @@ Return only the JSON array, no explanation.` }
               <>
                 <p className="text-sm text-gray-500 mb-3">Take a photo or upload an image of your wholesaler bill. AI will read and extract all medicines.</p>
                 <div className="flex gap-2 mb-3">
-                  <button onClick={() => billCameraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 rounded-xl py-4 text-sm text-indigo-600 hover:bg-indigo-50">
+                  <button onClick={() => billCameraRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 rounded-xl py-4 text-sm text-indigo-600 hover:bg-indigo-50">
                     <Camera size={18} /> Take Photo
                   </button>
-                  <button onClick={() => billGalleryRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-xl py-4 text-sm text-gray-600 hover:bg-gray-50">
+                  <button onClick={() => billGalleryRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-xl py-4 text-sm text-gray-600 hover:bg-gray-50">
                     <Image size={18} /> From Gallery
                   </button>
                 </div>
@@ -390,10 +335,13 @@ Return only the JSON array, no explanation.` }
             )}
 
             <div className="flex gap-2 mt-4">
-              <button onClick={parseBill} disabled={billMode === "text" ? !billText.trim() : !billImage} className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+              <button onClick={parseBill}
+                disabled={billMode === "text" ? !billText.trim() : !billImage}
+                className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
                 Extract Products with AI
               </button>
-              <button onClick={() => setShowWholesalerForm(false)} className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm text-gray-600">Cancel</button>
+              <button onClick={() => setShowWholesalerForm(false)}
+                className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm text-gray-600">Cancel</button>
             </div>
           </div>
         </div>
@@ -425,18 +373,26 @@ Return only the JSON array, no explanation.` }
                 ].map(({ label, key, span, type, required }) => (
                   <div key={key} className={span === 2 ? "col-span-2" : ""}>
                     <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-                    <input type={type || "text"} required={required} value={(form as any)[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                    <input type={type || "text"} required={required}
+                      value={(form as any)[key]}
+                      onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" />
                   </div>
                 ))}
                 <div className="col-span-2 flex items-center gap-2">
-                  <input type="checkbox" id="rx" checked={form.requiresPrescription} onChange={e => setForm(p => ({ ...p, requiresPrescription: e.target.checked }))} className="w-4 h-4" />
+                  <input type="checkbox" id="rx" checked={form.requiresPrescription}
+                    onChange={e => setForm(p => ({ ...p, requiresPrescription: e.target.checked }))}
+                    className="w-4 h-4" />
                   <label htmlFor="rx" className="text-sm text-gray-700">Requires Prescription</label>
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button type="submit" disabled={saving} className="flex-1 bg-teal-500 hover:bg-teal-600 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-medium">{saving ? "Saving…" : editing ? "Update Product" : "Add Product"}</button>
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm text-gray-600">Cancel</button>
+                <button type="submit" disabled={saving}
+                  className="flex-1 bg-teal-500 hover:bg-teal-600 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-medium">
+                  {saving ? "Saving…" : editing ? "Update Product" : "Add Product"}
+                </button>
+                <button type="button" onClick={() => setShowForm(false)}
+                  className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm text-gray-600">Cancel</button>
               </div>
             </form>
           </div>

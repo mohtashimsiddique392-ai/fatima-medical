@@ -9,6 +9,7 @@ import adminRouter from "./admin";
 import familyRouter from "./family";
 import healthRecordsRouter from "./healthrecords";
 import otpRouter from "./otp";
+import scanRouter from "./scan";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/admin", adminRouter);
 router.use("/family", familyRouter);
 router.use("/health-records", healthRecordsRouter);
 router.use("/otp", otpRouter);
+router.use("/scan", scanRouter);
 
 export default router;
