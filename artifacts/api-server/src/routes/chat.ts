@@ -15,13 +15,18 @@ router.post("/", async (req, res) => {
     return res.status(500).json({ error: "Groq API key not configured" });
   }
 
-  const products = await db.select().from(productsTable).where(eq(productsTable.isActive, true));
-  const productList = products.map(p => `- ${p.name} (₹${p.price}, category: ${p.category})`).join("\n");
+  const products = await db
+    .select()
+    .from(productsTable)
+    .where(eq(productsTable.isActive, true));
+  const productList = products
+    .map((p) => `- ${p.name} (₹${p.price}, category: ${p.category})`)
+    .join("\n");
 
   const systemPrompt = `You are a helpful medical and pharmacy assistant for Fatima Medical Store, Lucknow.
 
 STRICT RULES:
-1. ONLY answer questions related to health, medicine, symptoms, dosage, medical conditions, nutrition, or pharmacy services.
+1. ONLY answer questions related to health, medicine, symptoms, dosage, medical conditions, nutrition, pharmacy services, or any medicine-related queries including generic medicines, branded medicines, syrups, health supplements, vitamins, ayurvedic medicines, OTC medicines, prescription medicines, or any product that can be found in a pharmacy.
 2. If the user asks about anything unrelated to health/medicine/pharmacy, politely say: "I'm a medical assistant and can only help with health or medicine related questions."
 3. Always ask relevant follow-up questions before giving advice — such as age, symptoms duration, allergies, current medications.
 4. Give short, clear, easy-to-understand answers. Use simple language.
@@ -44,7 +49,7 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
     .filter((m: any) => m.text && m.text.trim().length > 0)
     .map((m: any) => ({
       role: m.role === "bot" ? "assistant" : "user",
-      content: m.text.trim()
+      content: m.text.trim(),
     }));
 
   try {
@@ -56,19 +61,19 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: "llama-3.1-8b-instant",
           messages: [
             { role: "system", content: systemPrompt },
             ...chatHistory,
-            { role: "user", content: message }
+            { role: "user", content: message },
           ],
           max_tokens: 500,
-          temperature: 0.7
-        })
-      }
+          temperature: 0.7,
+        }),
+      },
     );
 
     console.log("Groq status:", response.status);
@@ -77,12 +82,19 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
 
     if (!response.ok) {
       console.error("Groq error:", JSON.stringify(data));
-      return res.status(500).json({ error: data.error?.message || "Groq error " + response.status });
+      return res
+        .status(500)
+        .json({
+          error: data.error?.message || "Groq error " + response.status,
+        });
     }
 
     let reply = data.choices?.[0]?.message?.content;
     if (!reply) {
-      console.error("No reply in Groq response:", JSON.stringify(data).slice(0, 300));
+      console.error(
+        "No reply in Groq response:",
+        JSON.stringify(data).slice(0, 300),
+      );
       reply = "Sorry, I could not process that. Please try again.";
     }
 
@@ -90,10 +102,12 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
     if (reply.includes("SUGGEST_PRODUCTS:")) {
       const parts = reply.split("SUGGEST_PRODUCTS:");
       reply = parts[0].trim();
-      const names = parts[1].split(",").map((n: string) => n.trim().toLowerCase());
-      suggestedProducts = products.filter(p =>
-        names.some(n => p.name.toLowerCase().includes(n))
-      ).slice(0, 3);
+      const names = parts[1]
+        .split(",")
+        .map((n: string) => n.trim().toLowerCase());
+      suggestedProducts = products
+        .filter((p) => names.some((n) => p.name.toLowerCase().includes(n)))
+        .slice(0, 3);
     }
 
     res.json({ reply, suggestedProducts });
