@@ -2,9 +2,9 @@ import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
 import { Plus, Pencil, Trash2, Camera, X, Check, AlertTriangle, FileText, Image } from "lucide-react";
 
-interface Product { id: number; name: string; description?: string; price: string; category: string; stock: number; dosage?: string; howToTake?: string; sideEffects?: string; requiresPrescription: boolean; imageUrl?: string; isActive: boolean; expiryDate?: string; batchNumber?: string; manufacturer?: string; costPrice?: string; }
+interface Product { id: number; name: string; saltName?: string; description?: string; price: string; category: string; stock: number; dosage?: string; howToTake?: string; sideEffects?: string; requiresPrescription: boolean; imageUrl?: string; isActive: boolean; expiryDate?: string; batchNumber?: string; manufacturer?: string; costPrice?: string; }
 
-const EMPTY = { name: "", description: "", price: "", category: "", stock: 0, dosage: "", howToTake: "", sideEffects: "", requiresPrescription: false, imageUrl: "", expiryDate: "", batchNumber: "", manufacturer: "", costPrice: "" };
+const EMPTY = { name: "", saltName: "", description: "", price: "", category: "", stock: 0, dosage: "", howToTake: "", sideEffects: "", requiresPrescription: false, imageUrl: "", expiryDate: "", batchNumber: "", manufacturer: "", costPrice: "" };
 
 function expiryStatus(date?: string) {
   if (!date) return null;
@@ -40,11 +40,13 @@ export default function AdminCatalogue() {
   const [billMode, setBillMode] = useState<"text" | "image">("text");
   const [expiryFilter, setExpiryFilter] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
+  const [suggestedImageUrl, setSuggestedImageUrl] = useState("");
 
   const scanCameraRef = useRef<HTMLInputElement>(null);
   const scanGalleryRef = useRef<HTMLInputElement>(null);
   const billCameraRef = useRef<HTMLInputElement>(null);
   const billGalleryRef = useRef<HTMLInputElement>(null);
+  const productImageRef = useRef<HTMLInputElement>(null);
 
   const load = () => api.getProducts().then(r => { setProducts(r.products); setLoading(false); });
   useEffect(() => { load(); }, []);
@@ -54,10 +56,11 @@ export default function AdminCatalogue() {
   const expiringProducts = products.filter(p => p.expiryDate && p.expiryDate <= soonStr);
   const displayProducts = expiryFilter ? expiringProducts : products;
 
-  const openNew = () => { setEditing(null); setForm({ ...EMPTY }); setShowForm(true); };
+  const openNew = () => { setEditing(null); setForm({ ...EMPTY }); setSuggestedImageUrl(""); setShowForm(true); };
   const openEdit = (p: Product) => {
     setEditing(p);
-    setForm({ name: p.name, description: p.description || "", price: p.price, category: p.category, stock: p.stock, dosage: p.dosage || "", howToTake: p.howToTake || "", sideEffects: (p as any).sideEffects || "", requiresPrescription: p.requiresPrescription, imageUrl: p.imageUrl || "", expiryDate: p.expiryDate || "", batchNumber: p.batchNumber || "", manufacturer: p.manufacturer || "", costPrice: p.costPrice || "" });
+    setForm({ name: p.name, saltName: p.saltName || "", description: p.description || "", price: p.price, category: p.category, stock: p.stock, dosage: p.dosage || "", howToTake: p.howToTake || "", sideEffects: (p as any).sideEffects || "", requiresPrescription: p.requiresPrescription, imageUrl: p.imageUrl || "", expiryDate: p.expiryDate || "", batchNumber: p.batchNumber || "", manufacturer: p.manufacturer || "", costPrice: p.costPrice || "" });
+    setSuggestedImageUrl("");
     setShowForm(true);
   };
 
@@ -79,6 +82,14 @@ export default function AdminCatalogue() {
     if (bulkProducts.length <= 1) { setShowBulk(false); load(); }
   };
 
+  // Handle product image upload (for admin to attach to product)
+  const handleProductImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const base64 = await fileToBase64(file);
+    setForm(p => ({ ...p, imageUrl: `data:image/jpeg;base64,${base64}` }));
+    if (productImageRef.current) productImageRef.current.value = "";
+  };
+
   const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     setAiProcessing(true);
@@ -87,15 +98,17 @@ export default function AdminCatalogue() {
       const base64 = await fileToBase64(file);
       const data = await api.scanImage({ image: base64, type: "single" });
       const parsed = data.result;
+      setSuggestedImageUrl(parsed.suggestedImageUrl || "");
       setForm(p => ({
-        ...p,
-        ...parsed,
+        ...p, ...parsed,
         price: String(parsed.price || ""),
-        stock: Number(parsed.stock) || 10
+        stock: Number(parsed.stock) || 10,
+        saltName: parsed.saltName || "",
+        imageUrl: parsed.suggestedImageUrl || p.imageUrl || ""
       }));
-      setScanMsg("✓ AI scan complete! Review details below and save.");
+      setScanMsg("✓ AI scan complete! Review details and image below then save.");
       setShowForm(true);
-    } catch (err) {
+    } catch {
       setScanMsg("AI scan failed. Please try again or add manually.");
       setShowForm(true);
     } finally {
@@ -109,7 +122,6 @@ export default function AdminCatalogue() {
     const file = e.target.files?.[0]; if (!file) return;
     setBillImage(file);
     setBillMode("image");
-    setScanMsg("Bill image selected. Click 'Extract Products with AI' to process.");
     if (billCameraRef.current) billCameraRef.current.value = "";
     if (billGalleryRef.current) billGalleryRef.current.value = "";
   };
@@ -120,7 +132,6 @@ export default function AdminCatalogue() {
     setShowWholesalerForm(false);
     try {
       let parsed: any[];
-
       if (billMode === "image" && billImage) {
         const base64 = await fileToBase64(billImage);
         const data = await api.scanImage({ image: base64, type: "bill" });
@@ -134,11 +145,10 @@ export default function AdminCatalogue() {
         const data = await res.json();
         parsed = Array.isArray(data.result) ? data.result : [data.result];
       }
-
       setBulkProducts(parsed);
       setShowBulk(true);
       setScanMsg(`✓ Found ${parsed.length} products from bill. Review and save each one.`);
-    } catch (err) {
+    } catch {
       setScanMsg("AI processing failed. Please try again.");
       setShowWholesalerForm(true);
     } finally {
@@ -173,8 +183,7 @@ export default function AdminCatalogue() {
             </div>
             <input ref={scanCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScan} />
             <input ref={scanGalleryRef} type="file" accept="image/*" className="hidden" onChange={handleScan} />
-            <button onClick={openNew}
-              className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
+            <button onClick={openNew} className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded-lg text-sm font-medium">
               <Plus size={15} /> Add Product
             </button>
           </div>
@@ -208,20 +217,31 @@ export default function AdminCatalogue() {
 
         {showBulk && bulkProducts.length > 0 && (
           <div className="mb-4 bg-white rounded-xl border border-indigo-200 p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Products from Wholesaler Bill — Review & Save</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">Products from Bill — Review & Save</h3>
             <div className="space-y-3">
               {bulkProducts.map((p, i) => (
                 <div key={i} className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-200">
+                  {p.suggestedImageUrl && (
+                    <img src={p.suggestedImageUrl} alt={p.name}
+                      className="w-12 h-12 rounded-lg object-cover border border-indigo-200 flex-shrink-0"
+                      onError={e => (e.currentTarget.style.display = "none")} />
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 text-sm">{p.name}</p>
-                    <p className="text-xs text-gray-500">₹{p.price} · Stock: {p.stock} · {p.category} · Batch: {p.batchNumber} · Exp: {p.expiryDate || "—"}</p>
+                    {p.saltName && <p className="text-xs text-teal-600 font-medium">{p.saltName}</p>}
+                    <p className="text-xs text-gray-500">₹{p.price} · Stock: {p.stock} · {p.category} · Exp: {p.expiryDate || "—"}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setForm({ ...EMPTY, ...p, price: String(p.price), stock: Number(p.stock) }); setEditing(null); setBulkProducts(prev => prev.filter((_, j) => j !== i)); setShowForm(true); }}
-                      className="text-xs bg-white border border-indigo-300 text-indigo-600 px-2 py-1.5 rounded-lg">
+                    <button onClick={() => {
+                      setForm({ ...EMPTY, ...p, price: String(p.price), stock: Number(p.stock), saltName: p.saltName || "", imageUrl: p.suggestedImageUrl || "" });
+                      setSuggestedImageUrl(p.suggestedImageUrl || "");
+                      setEditing(null);
+                      setBulkProducts(prev => prev.filter((_, j) => j !== i));
+                      setShowForm(true);
+                    }} className="text-xs bg-white border border-indigo-300 text-indigo-600 px-2 py-1.5 rounded-lg">
                       <Pencil size={12} />
                     </button>
-                    <button onClick={() => saveBulkProduct(p, i)}
+                    <button onClick={() => saveBulkProduct({ ...p, saltName: p.saltName || "", imageUrl: p.suggestedImageUrl || p.imageUrl || "" }, i)}
                       className="text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-medium">Save</button>
                   </div>
                 </div>
@@ -235,7 +255,7 @@ export default function AdminCatalogue() {
         <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>{["Name", "Category", "Price", "Stock", "Expiry", "Rx", "Actions"].map(h =>
+              <tr>{["Image", "Name & Salt", "Category", "Price", "Stock", "Expiry", "Rx", "Actions"].map(h =>
                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               )}</tr>
             </thead>
@@ -245,7 +265,16 @@ export default function AdminCatalogue() {
                 return (
                   <tr key={p.id} className={`hover:bg-gray-50 ${exp?.cls.includes("red") ? "bg-red-50/30" : ""}`}>
                     <td className="px-4 py-3">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-gray-100"
+                          onError={e => (e.currentTarget.style.display = "none")} />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-300 text-xs">No img</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{p.name}</p>
+                      {p.saltName && <p className="text-xs text-teal-600 font-medium">{p.saltName}</p>}
                       {p.manufacturer && <p className="text-xs text-gray-400">{p.manufacturer}</p>}
                       {p.batchNumber && <p className="text-xs text-gray-300">Batch: {p.batchNumber}</p>}
                     </td>
@@ -278,8 +307,7 @@ export default function AdminCatalogue() {
                 );
               })}
               {displayProducts.length === 0 &&
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No products to show.</td></tr>
-              }
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">No products to show.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -303,17 +331,16 @@ export default function AdminCatalogue() {
                 📷 Photo of Bill
               </button>
             </div>
-
             {billMode === "text" ? (
               <>
-                <p className="text-sm text-gray-500 mb-3">Paste your wholesaler bill text. AI will extract all medicine details automatically.</p>
+                <p className="text-sm text-gray-500 mb-3">Paste your wholesaler bill text. AI will extract all medicines including salt names.</p>
                 <textarea rows={8} value={billText} onChange={e => setBillText(e.target.value)}
-                  placeholder={"Supplier: Rajesh Medical\nDate: 20/04/2026\nBatch: BT2024\nExp: 06/2026\n\nParacetamol 500mg   Qty: 100  ₹22.00\nAzithromycin 500mg  Qty: 30   ₹85.00\nCetirizine 10mg     Qty: 50   ₹38.00"}
+                  placeholder={"Supplier: Rajesh Medical\nDate: 20/04/2026\n\nParacetamol 500mg   Qty: 100  ₹22.00\nAzithromycin 500mg  Qty: 30   ₹85.00"}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-indigo-400 resize-none" />
               </>
             ) : (
               <>
-                <p className="text-sm text-gray-500 mb-3">Take a photo or upload an image of your wholesaler bill. AI will read and extract all medicines.</p>
+                <p className="text-sm text-gray-500 mb-3">Take a photo or upload your wholesaler bill. AI will read and extract all medicines.</p>
                 <div className="flex gap-2 mb-3">
                   <button onClick={() => billCameraRef.current?.click()}
                     className="flex-1 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 rounded-xl py-4 text-sm text-indigo-600 hover:bg-indigo-50">
@@ -333,10 +360,8 @@ export default function AdminCatalogue() {
                 <input ref={billGalleryRef} type="file" accept="image/*" className="hidden" onChange={handleBillImage} />
               </>
             )}
-
             <div className="flex gap-2 mt-4">
-              <button onClick={parseBill}
-                disabled={billMode === "text" ? !billText.trim() : !billImage}
+              <button onClick={parseBill} disabled={billMode === "text" ? !billText.trim() : !billImage}
                 className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
                 Extract Products with AI
               </button>
@@ -357,32 +382,86 @@ export default function AdminCatalogue() {
             </div>
             <form onSubmit={save} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Product Name *", key: "name", span: 2, required: true },
-                  { label: "Category *", key: "category", required: true },
-                  { label: "Price (₹) *", key: "price", type: "number", required: true },
-                  { label: "Cost Price (₹)", key: "costPrice", type: "number" },
-                  { label: "Stock", key: "stock", type: "number" },
-                  { label: "Expiry Date", key: "expiryDate", type: "date" },
-                  { label: "Batch Number", key: "batchNumber" },
-                  { label: "Manufacturer", key: "manufacturer" },
-                  { label: "Dosage", key: "dosage", span: 2 },
-                  { label: "How to Take", key: "howToTake", span: 2 },
-                  { label: "Side Effects", key: "sideEffects", span: 2 },
-                  { label: "Image URL", key: "imageUrl", span: 2 },
-                ].map(({ label, key, span, type, required }) => (
-                  <div key={key} className={span === 2 ? "col-span-2" : ""}>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-                    <input type={type || "text"} required={required}
-                      value={(form as any)[key]}
-                      onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" />
+
+                {/* Image section */}
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Product Image</label>
+                  <div className="flex gap-3 items-start">
+                    {form.imageUrl && (
+                      <img src={form.imageUrl} alt="preview"
+                        className="w-20 h-20 rounded-xl object-cover border border-gray-200 flex-shrink-0"
+                        onError={e => (e.currentTarget.style.display = "none")} />
+                    )}
+                    <div className="flex-1 space-y-2">
+                      {suggestedImageUrl && suggestedImageUrl !== form.imageUrl && (
+                        <div className="bg-teal-50 border border-teal-200 rounded-lg p-2">
+                          <p className="text-xs text-teal-700 font-medium mb-1">AI suggested image:</p>
+                          <img src={suggestedImageUrl} alt="suggested"
+                            className="w-16 h-16 rounded-lg object-cover border border-teal-200 mb-1"
+                            onError={e => (e.currentTarget.style.display = "none")} />
+                          <button type="button" onClick={() => setForm(p => ({ ...p, imageUrl: suggestedImageUrl }))}
+                            className="text-xs bg-teal-500 text-white px-2 py-1 rounded-lg">Use this image</button>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => { productImageRef.current!.capture = "environment"; productImageRef.current?.click(); }}
+                          className="flex items-center gap-1 text-xs border border-gray-200 px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50">
+                          <Camera size={12} /> Camera
+                        </button>
+                        <button type="button" onClick={() => { productImageRef.current!.removeAttribute("capture"); productImageRef.current?.click(); }}
+                          className="flex items-center gap-1 text-xs border border-gray-200 px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50">
+                          <Image size={12} /> Gallery
+                        </button>
+                      </div>
+                      <input ref={productImageRef} type="file" accept="image/*" className="hidden" onChange={handleProductImage} />
+                      <input type="text" value={form.imageUrl} onChange={e => setForm(p => ({ ...p, imageUrl: e.target.value }))}
+                        placeholder="Or paste image URL"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-teal-400" />
+                    </div>
                   </div>
-                ))}
+                </div>
+
+                {[
+  { label: "Product Name *", key: "name", span: 2, required: true },
+  { label: "Price (₹) *", key: "price", type: "number", required: true },
+  { label: "Cost Price (₹)", key: "costPrice", type: "number" },
+  { label: "Stock", key: "stock", type: "number" },
+  { label: "Expiry Date", key: "expiryDate", type: "date" },
+  { label: "Batch Number", key: "batchNumber" },
+  { label: "Manufacturer", key: "manufacturer" },
+  { label: "Dosage", key: "dosage", span: 2 },
+  { label: "How to Take", key: "howToTake", span: 2 },
+  { label: "Side Effects", key: "sideEffects", span: 2 },
+].map(({ label, key, span, type, required }) => (
+  <div key={key} className={span === 2 ? "col-span-2" : ""}>
+    <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+    <input type={type || "text"} required={required}
+      value={(form as any)[key]}
+      onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" />
+  </div>
+))}
+
+{/* Category dropdown — separate from the map */}
+<div key="category">
+  <label className="block text-xs font-medium text-gray-600 mb-1">Category *</label>
+  <select required value={form.category}
+    onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400">
+    <option value="">Select category</option>
+    {[
+      "Pain Relief", "Antibiotic", "Allergy", "Gastro", "Diabetes",
+      "Vitamin & Supplement", "Syrup", "Injection", "Cream & Ointment",
+      "Baby Care", "Surgical & Dressing", "Hygiene & Sanitizer",
+      "Health Drink & Nutrition", "Ayurvedic", "Eye & Ear Drops",
+      "Cardiac & BP", "Skin Care", "Women Health", "General OTC"
+    ].map(c => <option key={c} value={c}>{c}</option>)}
+  </select>
+</div>
+
                 <div className="col-span-2 flex items-center gap-2">
                   <input type="checkbox" id="rx" checked={form.requiresPrescription}
-                    onChange={e => setForm(p => ({ ...p, requiresPrescription: e.target.checked }))}
-                    className="w-4 h-4" />
+                    onChange={e => setForm(p => ({ ...p, requiresPrescription: e.target.checked }))} className="w-4 h-4" />
                   <label htmlFor="rx" className="text-sm text-gray-700">Requires Prescription</label>
                 </div>
               </div>

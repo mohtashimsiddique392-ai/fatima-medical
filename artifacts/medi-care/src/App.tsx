@@ -21,12 +21,13 @@ import AdminOrders from "@/pages/admin/Orders";
 import AdminCustomers from "@/pages/admin/Customers";
 import ChangePassword from "@/pages/admin/ChangePassword";
 import ExpiryAlerts from "@/pages/admin/ExpiryAlerts";
+import AdminBilling from "@/pages/admin/Billing";
+import SubAdmins from "@/pages/admin/SubAdmins";
+import StoreSettings from "@/pages/admin/StoreSettings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
-// Shows a blank screen for one frame while localStorage is read,
-// preventing a flash-redirect to /login on refresh or back-navigation.
 function ProtectedCustomer({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
@@ -57,48 +58,22 @@ function AppRouter() {
         <Route path="/login" component={CustomerLogin} />
         <Route path="/register" component={CustomerRegister} />
         <Route path="/admin-login" component={AdminLogin} />
-
-        <Route path="/store">
-          <ProtectedCustomer><Store /></ProtectedCustomer>
-        </Route>
-        <Route path="/cart">
-          <Cart />
-        </Route>
-        <Route path="/orders">
-          <ProtectedCustomer><Orders /></ProtectedCustomer>
-        </Route>
-        <Route path="/referrals">
-          <ProtectedCustomer><Referrals /></ProtectedCustomer>
-        </Route>
-        <Route path="/chat">
-          <Chatbot />
-        </Route>
-        <Route path="/family">
-          <ProtectedCustomer><FamilyMembers /></ProtectedCustomer>
-        </Route>
-        <Route path="/health">
-          <ProtectedCustomer><HealthRecords /></ProtectedCustomer>
-        </Route>
-
-        <Route path="/admin">
-          <ProtectedAdmin><AdminDashboard /></ProtectedAdmin>
-        </Route>
-        <Route path="/admin/catalogue">
-          <ProtectedAdmin><AdminCatalogue /></ProtectedAdmin>
-        </Route>
-        <Route path="/admin/orders">
-          <ProtectedAdmin><AdminOrders /></ProtectedAdmin>
-        </Route>
-        <Route path="/admin/customers">
-          <ProtectedAdmin><AdminCustomers /></ProtectedAdmin>
-        </Route>
-        <Route path="/admin/change-password">
-          <ProtectedAdmin><ChangePassword /></ProtectedAdmin>
-        </Route>
-        <Route path="/admin/expiry">
-          <ProtectedAdmin><ExpiryAlerts /></ProtectedAdmin>
-        </Route>
-
+        <Route path="/store"><ProtectedCustomer><Store /></ProtectedCustomer></Route>
+        <Route path="/cart"><Cart /></Route>
+        <Route path="/orders"><ProtectedCustomer><Orders /></ProtectedCustomer></Route>
+        <Route path="/referrals"><ProtectedCustomer><Referrals /></ProtectedCustomer></Route>
+        <Route path="/chat"><Chatbot /></Route>
+        <Route path="/family"><ProtectedCustomer><FamilyMembers /></ProtectedCustomer></Route>
+        <Route path="/health"><ProtectedCustomer><HealthRecords /></ProtectedCustomer></Route>
+        <Route path="/admin"><ProtectedAdmin><AdminDashboard /></ProtectedAdmin></Route>
+        <Route path="/admin/catalogue"><ProtectedAdmin><AdminCatalogue /></ProtectedAdmin></Route>
+        <Route path="/admin/orders"><ProtectedAdmin><AdminOrders /></ProtectedAdmin></Route>
+        <Route path="/admin/customers"><ProtectedAdmin><AdminCustomers /></ProtectedAdmin></Route>
+        <Route path="/admin/change-password"><ProtectedAdmin><ChangePassword /></ProtectedAdmin></Route>
+        <Route path="/admin/expiry"><ProtectedAdmin><ExpiryAlerts /></ProtectedAdmin></Route>
+        <Route path="/admin/billing"><ProtectedAdmin><AdminBilling /></ProtectedAdmin></Route>
+        <Route path="/admin/sub-admins"><ProtectedAdmin><SubAdmins /></ProtectedAdmin></Route>
+        <Route path="/admin/settings"><ProtectedAdmin><StoreSettings /></ProtectedAdmin></Route>
         <Route component={NotFound} />
       </Switch>
     </>

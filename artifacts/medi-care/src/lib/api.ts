@@ -88,4 +88,17 @@ export const api = {
   },
   addHealthRecord: (body: any) => apiFetch("/health-records", { method: "POST", body: JSON.stringify(body) }),
   deleteHealthRecord: (id: number) => apiFetch(`/health-records/${id}`, { method: "DELETE" }),
+  // Billing
+  getBillingSettings: () => apiFetch("/billing/settings"),
+  updateBillingSettings: (body: any) => apiFetch("/billing/settings", { method: "PUT", body: JSON.stringify(body) }),
+  getSubAdmins: () => apiFetch("/billing/sub-admins"),
+  createSubAdmin: (body: any) => apiFetch("/billing/sub-admins", { method: "POST", body: JSON.stringify(body) }),
+  updateSubAdmin: (id: number, body: any) => apiFetch(`/billing/sub-admins/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteSubAdmin: (id: number) => apiFetch(`/billing/sub-admins/${id}`, { method: "DELETE" }),
+  subAdminLogin: (body: { username: string; password: string }) => apiFetch("/billing/sub-admins/login", { method: "POST", body: JSON.stringify(body) }),
+  lookupCustomer: (phone: string) => apiFetch(`/billing/customer-lookup?phone=${encodeURIComponent(phone)}`),
+  getBills: () => apiFetch("/billing/bills"),
+  getBill: (id: number) => apiFetch(`/billing/bills/${id}`),
+  createBill: (body: any) => apiFetch("/billing/bills", { method: "POST", body: JSON.stringify(body) }),
+  scanImage: (body: { image: string; type: string }) => apiFetch("/scan", { method: "POST", body: JSON.stringify(body) }),
 };

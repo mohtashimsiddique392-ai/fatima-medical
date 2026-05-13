@@ -15,7 +15,7 @@ router.post("/", async (req, res) => {
     "name": "medicine name with strength",
     "price": "MRP number only",
     "stock": 10,
-    "category": "Pain Relief or Antibiotic or Allergy or Gastro or Diabetes or Vitamin or Syrup or Supplement or General",
+    "category": "Pain Relief or Antibiotic or Allergy or Gastro or Diabetes or Vitamin & Supplement or Syrup or Injection or Cream & Ointment or Baby Care or Surgical & Dressing or Hygiene & Sanitizer or Health Drink & Nutrition or Ayurvedic or Eye & Ear Drops or Cardiac & BP or Skin Care or Women Health or General OTC",
     "batchNumber": "batch number if visible or empty string",
     "expiryDate": "YYYY-MM-DD format if visible or empty string",
     "manufacturer": "manufacturer name if visible or empty string",

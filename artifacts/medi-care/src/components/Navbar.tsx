@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShoppingCart, LogOut, Menu, X, User, ChevronDown } from "lucide-react";
+import { ShoppingCart, LogOut, Menu, X, User, ChevronDown, Receipt, Shield, Settings } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 export default function Navbar() {
@@ -8,13 +8,16 @@ export default function Navbar() {
   const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const adminMenuRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => { logout(); setProfileOpen(false); navigate("/"); };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+      if (adminMenuRef.current && !adminMenuRef.current.contains(e.target as Node)) setAdminMenuOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -32,6 +35,7 @@ export default function Navbar() {
           </div>
         </Link>
 
+        {/* Customer Nav */}
         {user?.role === "customer" && (
           <div className="hidden md:flex items-center gap-5 text-sm">
             <Link href="/store"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Store</span></Link>
@@ -43,13 +47,51 @@ export default function Navbar() {
           </div>
         )}
 
+        {/* Admin Nav */}
         {user?.role === "admin" && (
-          <div className="hidden md:flex items-center gap-4 text-sm">
-            <Link href="/admin"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Dashboard</span></Link>
-            <Link href="/admin/catalogue"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Catalogue</span></Link>
-            <Link href="/admin/expiry"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Expiry Alerts</span></Link>
-            <Link href="/admin/orders"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Orders</span></Link>
-            <Link href="/admin/customers"><span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium">Customers</span></Link>
+          <div className="hidden md:flex items-center gap-1 text-sm">
+            <Link href="/admin">
+              <span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium px-2 py-1.5 rounded-lg hover:bg-teal-50">Dashboard</span>
+            </Link>
+            <Link href="/admin/catalogue">
+              <span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium px-2 py-1.5 rounded-lg hover:bg-teal-50">Catalogue</span>
+            </Link>
+            <Link href="/admin/orders">
+              <span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium px-2 py-1.5 rounded-lg hover:bg-teal-50">Orders</span>
+            </Link>
+            <Link href="/admin/billing">
+              <span className="text-gray-600 hover:text-teal-600 cursor-pointer font-medium px-2 py-1.5 rounded-lg hover:bg-teal-50 flex items-center gap-1">
+                <Receipt size={13} /> Billing
+              </span>
+            </Link>
+
+            {/* More dropdown */}
+            <div className="relative" ref={adminMenuRef}>
+              <button onClick={() => setAdminMenuOpen(o => !o)}
+                className="flex items-center gap-1 text-gray-600 hover:text-teal-600 font-medium px-2 py-1.5 rounded-lg hover:bg-teal-50">
+                More <ChevronDown size={13} />
+              </button>
+              {adminMenuOpen && (
+                <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden z-50">
+                  <Link href="/admin/expiry" onClick={() => setAdminMenuOpen(false)}>
+                    <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer">Expiry Alerts</div>
+                  </Link>
+                  <Link href="/admin/customers" onClick={() => setAdminMenuOpen(false)}>
+                    <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer">Customers</div>
+                  </Link>
+                  <Link href="/admin/sub-admins" onClick={() => setAdminMenuOpen(false)}>
+                    <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer flex items-center gap-2">
+                      <Shield size={13} className="text-teal-500" /> Sub-Admins
+                    </div>
+                  </Link>
+                  <Link href="/admin/settings" onClick={() => setAdminMenuOpen(false)}>
+                    <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer flex items-center gap-2">
+                      <Settings size={13} className="text-teal-500" /> Store Settings
+                    </div>
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -66,7 +108,8 @@ export default function Navbar() {
           )}
           {user ? (
             <div className="relative" ref={profileRef}>
-              <button onClick={() => setProfileOpen(o => !o)} className="flex items-center gap-1.5 text-sm text-gray-700 hover:text-teal-600 px-2 py-1.5 rounded-lg hover:bg-teal-50">
+              <button onClick={() => setProfileOpen(o => !o)}
+                className="flex items-center gap-1.5 text-sm text-gray-700 hover:text-teal-600 px-2 py-1.5 rounded-lg hover:bg-teal-50">
                 <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center">
                   <User size={15} className="text-teal-600" />
                 </div>
@@ -93,11 +136,24 @@ export default function Navbar() {
                     </>
                   )}
                   {user.role === "admin" && (
-                    <Link href="/admin/change-password" onClick={() => setProfileOpen(false)}>
-                      <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer">Change Password</div>
-                    </Link>
+                    <>
+                      <Link href="/admin/change-password" onClick={() => setProfileOpen(false)}>
+                        <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer">Change Password</div>
+                      </Link>
+                      <Link href="/admin/settings" onClick={() => setProfileOpen(false)}>
+                        <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer flex items-center gap-2">
+                          <Settings size={13} /> Store Settings
+                        </div>
+                      </Link>
+                      <Link href="/admin/sub-admins" onClick={() => setProfileOpen(false)}>
+                        <div className="px-4 py-2.5 text-sm text-gray-700 hover:bg-teal-50 cursor-pointer flex items-center gap-2">
+                          <Shield size={13} /> Sub-Admins
+                        </div>
+                      </Link>
+                    </>
                   )}
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-100">
+                  <button onClick={handleLogout}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-100">
                     <LogOut size={14} /> Log out
                   </button>
                 </div>
@@ -115,6 +171,7 @@ export default function Navbar() {
         </div>
       </div>
 
+      {/* Mobile Menu */}
       {open && (
         <div className="md:hidden border-t border-teal-100 bg-white px-4 py-3 space-y-1">
           {user?.role === "customer" && (
@@ -141,7 +198,10 @@ export default function Navbar() {
                 { href: "/admin/catalogue", label: "Catalogue" },
                 { href: "/admin/expiry", label: "Expiry Alerts" },
                 { href: "/admin/orders", label: "Orders" },
+                { href: "/admin/billing", label: "🧾 Billing" },
                 { href: "/admin/customers", label: "Customers" },
+                { href: "/admin/sub-admins", label: "🛡 Sub-Admins" },
+                { href: "/admin/settings", label: "⚙️ Store Settings" },
                 { href: "/admin/change-password", label: "Change Password" },
               ].map(({ href, label }) => (
                 <Link key={href} href={href} onClick={() => setOpen(false)}>
