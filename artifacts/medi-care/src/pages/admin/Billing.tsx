@@ -299,7 +299,7 @@ export default function AdminBilling() {
     ${s.gstin ? `<div style="margin-top:2px;opacity:0.8;">GSTIN: ${s.gstin}</div>` : ""}
   </div>
 </div>
-<script>window.onload = () => { window.print(); }</script>
+<script>setTimeout(() => { window.print(); }, 500);</script>
 </body>
 </html>`);
     printWindow.document.close();
