@@ -173,18 +173,17 @@ export default function AdminBilling() {
       alert("Failed to save bill: " + e.message);
     } finally { setSaving(false); }
   };
+    
+const printBill = () => {
+  if (!savedBill) return;
+  const { bill, items: billItems, settings: s } = savedBill;
 
-  const printBill = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow || !savedBill) return;
-    const { bill, items: billItems, settings: s } = savedBill;
-    const gstRows = s.gst_enabled ? `
-      <tr><td colspan="6" style="text-align:right;padding:4px 8px;">CGST (${s.cgst_rate}%)</td><td style="padding:4px 8px;text-align:right;">₹${(Number(bill.gst_amount) / 2).toFixed(2)}</td></tr>
-      <tr><td colspan="6" style="text-align:right;padding:4px 8px;">SGST (${s.sgst_rate}%)</td><td style="padding:4px 8px;text-align:right;">₹${(Number(bill.gst_amount) / 2).toFixed(2)}</td></tr>
-    ` : "";
+  const gstRows = s.gst_enabled ? `
+    <tr><td colspan="6" style="text-align:right;padding:4px 8px;color:#666;">CGST (${s.cgst_rate}%)</td><td style="padding:4px 8px;text-align:right;">₹${(Number(bill.gst_amount) / 2).toFixed(2)}</td></tr>
+    <tr><td colspan="6" style="text-align:right;padding:4px 8px;color:#666;">SGST (${s.sgst_rate}%)</td><td style="padding:4px 8px;text-align:right;">₹${(Number(bill.gst_amount) / 2).toFixed(2)}</td></tr>
+  ` : "";
 
-    printWindow.document.write(`
-<!DOCTYPE html>
+  const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
   <title>Bill ${bill.bill_number}</title>
@@ -194,27 +193,28 @@ export default function AdminBilling() {
     .page { max-width: 800px; margin: 0 auto; padding: 24px; }
     .header { background: linear-gradient(135deg, #0d9488, #0f766e); color: white; padding: 20px 24px; border-radius: 12px 12px 0 0; display: flex; align-items: center; gap: 16px; }
     .logo-circle { width: 56px; height: 56px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .store-name { font-size: 22px; font-weight: bold; letter-spacing: 0.5px; }
+    .store-name { font-size: 22px; font-weight: bold; }
     .store-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
     .bill-meta { background: #f0fdfa; border: 1px solid #99f6e4; padding: 14px 24px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
     .bill-no { font-size: 16px; font-weight: bold; color: #0d9488; }
     .bill-date { color: #666; font-size: 11px; }
-    .customer-section { padding: 14px 24px; border-bottom: 1px solid #e5e7eb; background: white; }
+    .customer-section { padding: 14px 24px; border-bottom: 1px solid #e5e7eb; }
     .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 4px; }
-    .customer-name { font-size: 14px; font-weight: bold; color: #1a1a1a; }
+    .customer-name { font-size: 14px; font-weight: bold; }
     table { width: 100%; border-collapse: collapse; }
     .items-table th { background: #0d9488; color: white; padding: 9px 8px; text-align: left; font-size: 11px; }
     .items-table td { padding: 9px 8px; border-bottom: 1px solid #f3f4f6; font-size: 11px; vertical-align: top; }
-    .items-table tr:hover td { background: #f0fdfa; }
-    .medicine-name { font-weight: 600; color: #1a1a1a; }
+    .medicine-name { font-weight: 600; }
     .salt-name { font-size: 10px; color: #0d9488; margin-top: 1px; }
     .meta-text { font-size: 10px; color: #888; }
     .totals { padding: 16px 24px; background: #f9fafb; }
     .total-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
     .total-final { font-size: 16px; font-weight: bold; color: #0d9488; border-top: 2px solid #0d9488; margin-top: 8px; padding-top: 8px; }
     .footer { background: #0d9488; color: white; padding: 12px 24px; border-radius: 0 0 12px 12px; text-align: center; font-size: 10px; }
-    .gstin { font-size: 10px; color: #555; margin-top: 2px; }
-    @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .no-print { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -231,7 +231,7 @@ export default function AdminBilling() {
     <div>
       <div class="store-name">${s.store_name}</div>
       <div class="store-sub">${s.address || ""}</div>
-      <div class="store-sub">📞 ${s.phone || ""} ${s.gstin ? "| GSTIN: " + s.gstin : ""}</div>
+      <div class="store-sub">Tel: ${s.phone || ""} ${s.gstin ? "| GSTIN: " + s.gstin : ""}</div>
     </div>
   </div>
 
@@ -241,7 +241,7 @@ export default function AdminBilling() {
       <div class="bill-date">${new Date(bill.created_at).toLocaleString("en-IN")}</div>
     </div>
     <div style="text-align:right;">
-      <div style="font-size:11px;color:#666;">Payment: <strong>${bill.payment_method?.toUpperCase()}</strong></div>
+      <div style="font-size:11px;color:#666;">Payment: <strong>${(bill.payment_method || "cash").toUpperCase()}</strong></div>
     </div>
   </div>
 
@@ -249,20 +249,20 @@ export default function AdminBilling() {
   <div class="customer-section">
     <div class="section-title">Bill To</div>
     <div class="customer-name">${bill.customer_name}</div>
-    ${bill.customer_phone ? `<div style="color:#666;font-size:11px;">📞 ${bill.customer_phone}</div>` : ""}
-    ${bill.customer_address ? `<div style="color:#666;font-size:11px;">📍 ${bill.customer_address}</div>` : ""}
+    ${bill.customer_phone ? `<div style="color:#666;font-size:11px;">Tel: ${bill.customer_phone}</div>` : ""}
+    ${bill.customer_address ? `<div style="color:#666;font-size:11px;">${bill.customer_address}</div>` : ""}
   </div>` : ""}
 
   <table class="items-table">
     <thead>
       <tr>
-        <th>#</th>
+        <th style="width:30px;">#</th>
         <th>Medicine</th>
-        <th>Pack</th>
-        <th style="text-align:center;">Qty</th>
-        <th style="text-align:right;">MRP</th>
-        ${s.gst_enabled ? "<th style='text-align:center;'>GST%</th>" : ""}
-        <th style="text-align:right;">Amount</th>
+        <th style="width:60px;">Pack</th>
+        <th style="width:40px;text-align:center;">Qty</th>
+        <th style="width:70px;text-align:right;">MRP</th>
+        ${s.gst_enabled ? "<th style='width:50px;text-align:center;'>GST%</th>" : ""}
+        <th style="width:80px;text-align:right;">Amount</th>
       </tr>
     </thead>
     <tbody>
@@ -278,33 +278,46 @@ export default function AdminBilling() {
         </td>
         <td>${item.pack_type}</td>
         <td style="text-align:center;">${item.quantity}</td>
-        <td style="text-align:right;">₹${Number(item.mrp).toFixed(2)}</td>
-        ${s.gst_enabled ? `<td style="text-align:center;">${item.gst_rate}%</td>` : ""}
-        <td style="text-align:right;font-weight:600;">₹${Number(item.amount).toFixed(2)}</td>
+        <td style="text-align:right;">Rs.${Number(item.mrp).toFixed(2)}</td>
+        ${s.gst_enabled ? `<td style="text-align:center;">${item.gst_rate || 0}%</td>` : ""}
+        <td style="text-align:right;font-weight:600;">Rs.${Number(item.amount).toFixed(2)}</td>
       </tr>`).join("")}
     </tbody>
   </table>
 
   <div class="totals">
-    <div class="total-row"><span>Subtotal</span><span>₹${Number(bill.subtotal).toFixed(2)}</span></div>
-    ${Number(bill.discount) > 0 ? `<div class="total-row" style="color:#dc2626;"><span>Discount</span><span>-₹${Number(bill.discount).toFixed(2)}</span></div>` : ""}
-    ${Number(bill.discount) > 0 ? `<div class="total-row"><span>After Discount</span><span>₹${Number(bill.total_after_discount).toFixed(2)}</span></div>` : ""}
-    ${gstRows}
-    <div class="total-row total-final"><span>TOTAL</span><span>₹${Number(bill.final_total).toFixed(2)}</span></div>
+    <div style="max-width:250px;margin-left:auto;">
+      <div class="total-row"><span style="color:#666;">Subtotal</span><span>Rs.${Number(bill.subtotal).toFixed(2)}</span></div>
+      ${Number(bill.discount) > 0 ? `<div class="total-row" style="color:#dc2626;"><span>Discount</span><span>-Rs.${Number(bill.discount).toFixed(2)}</span></div>` : ""}
+      ${Number(bill.discount) > 0 ? `<div class="total-row"><span style="color:#666;">After Discount</span><span>Rs.${Number(bill.total_after_discount).toFixed(2)}</span></div>` : ""}
+      ${gstRows}
+      <div class="total-row total-final"><span>TOTAL</span><span>Rs.${Number(bill.final_total).toFixed(2)}</span></div>
+    </div>
   </div>
 
   <div class="footer">
     <div>Thank you for choosing ${s.store_name}!</div>
-    <div style="margin-top:4px;opacity:0.8;">This is a computer generated bill</div>
+    <div style="margin-top:4px;opacity:0.8;">Computer generated bill</div>
     ${s.gstin ? `<div style="margin-top:2px;opacity:0.8;">GSTIN: ${s.gstin}</div>` : ""}
   </div>
-</div>
-<script>setTimeout(() => { window.print(); }, 500);</script>
-</body>
-</html>`);
-    printWindow.document.close();
-  };
 
+  <div class="no-print" style="text-align:center;margin-top:20px;">
+    <button onclick="window.print()" style="background:#0d9488;color:white;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer;margin-right:10px;">Print / Save PDF</button>
+    <button onclick="window.close()" style="background:#e5e7eb;color:#374151;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer;">Close</button>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Please allow popups for this site to print bills.");
+    return;
+  }
+  printWindow.document.open();
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+};
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-6">
       <div className="max-w-4xl mx-auto">
