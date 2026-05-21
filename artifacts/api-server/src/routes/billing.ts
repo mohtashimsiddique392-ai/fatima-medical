@@ -111,7 +111,7 @@ router.get("/customer-lookup", async (req, res) => {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ error: "Phone required" });
     const { rows } = await pool.query(
-      "SELECT id, name, phone, address FROM customers WHERE phone = $1 LIMIT 1",
+      "SELECT id, name, phone FROM customers WHERE phone = $1 LIMIT 1",
       [phone]
     );
     if (!rows[0]) return res.status(404).json({ error: "Customer not found" });

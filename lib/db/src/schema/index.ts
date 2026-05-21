@@ -10,7 +10,6 @@ export const customersTable = pgTable("customers", {
   referralCode: varchar("referral_code", { length: 10 }).notNull().unique(),
   referredBy: integer("referred_by"),
   referralCredits: numeric("referral_credits", { precision: 10, scale: 2 }).notNull().default("0"),
-  address: text("address"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -62,8 +61,6 @@ export const adminTable = pgTable("admin", {
   username: varchar("username", { length: 50 }).notNull().unique(),
   password: text("password").notNull(),
   phone: varchar("phone", { length: 20 }).notNull(),
-  otp: varchar("otp", { length: 6 }),
-  otpExpiresAt: timestamp("otp_expires_at"),
 });
 
 export const familyMembersTable = pgTable("family_members", {
