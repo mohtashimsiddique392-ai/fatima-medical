@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -31,5 +31,13 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Global JSON error handler — ensures all errors return JSON, never HTML
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal server error";
+  logger.error({ err }, message);
+  res.status(status).json({ error: message });
+});
 
 export default app;
