@@ -100,5 +100,4 @@ export const api = {
   getBills: () => apiFetch("/billing/bills"),
   getBill: (id: number) => apiFetch(`/billing/bills/${id}`),
   createBill: (body: any) => apiFetch("/billing/bills", { method: "POST", body: JSON.stringify(body) }),
-  scanImage: (body: { image: string; type: string }) => apiFetch("/scan", { method: "POST", body: JSON.stringify(body) }),
 };
