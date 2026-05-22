@@ -77,7 +77,7 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
     );
 
     console.log("Groq status:", response.status);
-    const data = await response.json();
+    const data = await response.json() as any;
     console.log("Groq response:", JSON.stringify(data).slice(0, 300));
 
     if (!response.ok) {
@@ -106,14 +106,14 @@ SUGGEST_PRODUCTS: product name 1, product name 2`;
         .split(",")
         .map((n: string) => n.trim().toLowerCase());
       suggestedProducts = products
-        .filter((p) => names.some((n) => p.name.toLowerCase().includes(n)))
+        .filter((p) => names.some((n: string) => p.name.toLowerCase().includes(n)))
         .slice(0, 3);
     }
 
-    res.json({ reply, suggestedProducts });
+    return res.json({ reply, suggestedProducts });
   } catch (err: any) {
     console.error("Chat exception:", err.message);
-    res.status(500).json({ error: "Failed: " + err.message });
+    return res.status(500).json({ error: "Failed: " + err.message });
   }
 });
 

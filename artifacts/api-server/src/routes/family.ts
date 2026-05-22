@@ -10,7 +10,7 @@ router.get("/", async (req, res) => {
   const customerId = Number(req.query.customerId);
   if (!customerId) return res.status(400).json({ error: "customerId required" });
   const members = await db.select().from(familyMembersTable).where(eq(familyMembersTable.customerId, customerId));
-  res.json({ members });
+  return res.json({ members });
 });
 
 // Add a family member
@@ -18,7 +18,7 @@ router.post("/", async (req, res) => {
   const { customerId, name, relation, age, bloodGroup, allergies, medicalConditions } = req.body;
   if (!customerId || !name || !relation) return res.status(400).json({ error: "customerId, name, and relation required" });
   const [member] = await db.insert(familyMembersTable).values({ customerId, name, relation, age: age || null, bloodGroup: bloodGroup || null, allergies: allergies || null, medicalConditions: medicalConditions || null }).returning();
-  res.json({ member });
+  return res.json({ member });
 });
 
 // Update a family member

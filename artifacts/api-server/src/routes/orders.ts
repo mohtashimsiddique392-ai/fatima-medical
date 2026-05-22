@@ -62,7 +62,7 @@ router.get("/:id", async (req, res) => {
     .from(customersTable)
     .where(eq(customersTable.id, order.customerId))
     .limit(1);
-  res.json({
+  return res.json({
     ...order,
     items,
     customerName: customer?.name,
@@ -166,7 +166,7 @@ router.post("/", async (req, res) => {
     .select()
     .from(orderItemsTable)
     .where(eq(orderItemsTable.orderId, order.id));
-  res
+  return res
     .status(201)
     .json({
       ...order,
@@ -211,7 +211,7 @@ router.put("/:id/status", async (req, res) => {
     .select()
     .from(orderItemsTable)
     .where(eq(orderItemsTable.orderId, order.id));
-  res.json({ ...order, items });
+  return res.json({ ...order, items });
 });
 
 export default router;

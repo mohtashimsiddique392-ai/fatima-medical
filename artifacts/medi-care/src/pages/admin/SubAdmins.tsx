@@ -13,13 +13,13 @@ export default function SubAdmins() {
   const [subAdmins, setSubAdmins] = useState<SubAdmin[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SubAdmin | null>(null);
-  const [form, setForm] = useState({ username: "", password: "", name: "", phone: "", permissions: { catalogue: true, orders: true, billing: true, customers: false, dashboard: false } });
+  const [form, setForm] = useState<{ username: string; password: string; name: string; phone: string; permissions: Record<string, boolean> }>({ username: "", password: "", name: "", phone: "", permissions: { catalogue: true, orders: true, billing: true, customers: false, dashboard: false } });
   const [saving, setSaving] = useState(false);
 
   const load = () => api.getSubAdmins().then(r => setSubAdmins(r.subAdmins));
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEditing(null); setForm({ username: "", password: "", name: "", phone: "", permissions: { catalogue: true, orders: true, billing: true, customers: false, dashboard: false } }); setShowForm(true); };
+  const openNew = () => { setEditing(null); setForm({ username: "", password: "", name: "", phone: "", permissions: { catalogue: true, orders: true, billing: true, customers: false, dashboard: false } as Record<string, boolean> }); setShowForm(true); };
   const openEdit = (s: SubAdmin) => { setEditing(s); setForm({ username: s.username, password: "", name: s.name, phone: s.phone || "", permissions: s.permissions }); setShowForm(true); };
 
   const save = async (e: React.FormEvent) => {

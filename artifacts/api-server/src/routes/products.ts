@@ -43,7 +43,7 @@ router.get("/expiry-alerts", async (req, res) => {
 router.get("/:id", async (req, res) => {
   const [product] = await db.select().from(productsTable).where(eq(productsTable.id, Number(req.params.id))).limit(1);
   if (!product) return res.status(404).json({ error: "Product not found" });
-  res.json(product);
+  return res.json(product);
 });
 
 router.post("/", async (req, res) => {
@@ -58,7 +58,7 @@ router.post("/", async (req, res) => {
     manufacturer: manufacturer || null,
     costPrice: costPrice ? String(costPrice) : null,
   }).returning();
-  res.status(201).json(product);
+  return res.status(201).json(product);
 });
 
 router.put("/:id", async (req, res) => {
@@ -81,7 +81,7 @@ router.put("/:id", async (req, res) => {
     ...(costPrice !== undefined && { costPrice: costPrice ? String(costPrice) : null }),
   }).where(eq(productsTable.id, Number(req.params.id))).returning();
   if (!product) return res.status(404).json({ error: "Product not found" });
-  res.json(product);
+  return res.json(product);
 });
 
 router.delete("/:id", async (req, res) => {

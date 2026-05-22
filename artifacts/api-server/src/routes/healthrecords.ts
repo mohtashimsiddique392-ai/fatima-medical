@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
       .where(eq(healthRecordsTable.customerId, customerId))
       .orderBy(desc(healthRecordsTable.recordedAt));
   }
-  res.json({ records });
+  return res.json({ records });
 });
 
 // Add a health record
@@ -38,7 +38,7 @@ router.post("/", async (req, res) => {
     notes: notes || null,
     recordedAt: recordedAt ? new Date(recordedAt) : new Date(),
   }).returning();
-  res.json({ record });
+  return res.json({ record });
 });
 
 // Delete a health record

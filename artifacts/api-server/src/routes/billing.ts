@@ -56,10 +56,10 @@ router.post("/sub-admins", async (req, res) => {
       "INSERT INTO sub_admins (username, password, name, phone, permissions) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, name, phone, permissions, is_active",
       [username, hashed, name, phone, JSON.stringify(permissions || { catalogue: true, orders: true, billing: true, customers: false, dashboard: false })]
     );
-    res.status(201).json(rows[0]);
+    return res.status(201).json(rows[0]);
   } catch (e: any) {
     if (e.code === "23505") return res.status(400).json({ error: "Username already exists" });
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   } finally { pool.end(); }
 });
 
@@ -100,7 +100,7 @@ router.post("/sub-admins/login", async (req, res) => {
     const valid = await bcrypt.compare(password, rows[0].password);
     if (!valid) return res.status(401).json({ error: "Invalid credentials" });
     const { password: _, ...safe } = rows[0];
-    res.json({ ...safe, role: "subadmin" });
+    return res.json({ ...safe, role: "subadmin" });
   } finally { pool.end(); }
 });
 
@@ -115,7 +115,7 @@ router.get("/customer-lookup", async (req, res) => {
       [phone]
     );
     if (!rows[0]) return res.status(404).json({ error: "Customer not found" });
-    res.json(rows[0]);
+    return res.json(rows[0]);
   } finally { pool.end(); }
 });
 
@@ -135,7 +135,7 @@ router.get("/bills/:id", async (req, res) => {
     if (!bill) return res.status(404).json({ error: "Bill not found" });
     const { rows: items } = await pool.query("SELECT * FROM bill_items WHERE bill_id = $1", [bill.id]);
     const { rows: [settings] } = await pool.query("SELECT * FROM store_settings LIMIT 1");
-    res.json({ bill, items, settings });
+    return res.json({ bill, items, settings });
   } finally { pool.end(); }
 });
 
@@ -200,10 +200,10 @@ router.post("/bills", async (req, res) => {
 
     const { rows: [settings] } = await pool.query("SELECT * FROM store_settings LIMIT 1");
     const { rows: allItems } = await pool.query("SELECT * FROM bill_items WHERE bill_id = $1", [bill.id]);
-    res.status(201).json({ bill, items: allItems, settings });
+    return res.status(201).json({ bill, items: allItems, settings });
   } catch (e: any) {
     console.error("Bill error:", e.message);
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   } finally { pool.end(); }
 });
 

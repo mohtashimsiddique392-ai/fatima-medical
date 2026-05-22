@@ -22,11 +22,11 @@ router.get("/my", async (req, res) => {
     .from(customersTable)
     .where(eq(customersTable.referredBy, customer.id));
 
-  res.json({
+  return res.json({
     referralCode: customer.referralCode,
     credits: Number(customer.referralCredits),
     totalReferrals: referredUsers.length,
-    hasUsedReferral: !!customer.referredBy, // NEW LINE
+    hasUsedReferral: !!customer.referredBy,
     referredUsers: referredUsers.map((u) => ({
       name: u.name,
       joinedAt: u.createdAt,
@@ -72,7 +72,7 @@ router.post("/apply", async (req, res) => {
     .set({ referralCredits: String(Number(referrer.referralCredits) + 50) })
     .where(eq(customersTable.id, referrer.id));
 
-  res.json({
+  return res.json({
     message: "Referral applied! You and your referrer each earned ₹50 credits.",
   });
 });

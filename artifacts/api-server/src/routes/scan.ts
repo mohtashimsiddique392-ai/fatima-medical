@@ -60,7 +60,7 @@ Return only the JSON object, no explanation, no markdown.`;
       })
     });
 
-    const data = await response.json();
+    const data = await response.json() as any;
     console.log("Scan AI status:", response.status);
 
     if (!response.ok) {
@@ -73,10 +73,10 @@ Return only the JSON object, no explanation, no markdown.`;
 
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
-    res.json({ result: parsed });
+    return res.json({ result: parsed });
   } catch (err: any) {
     console.error("Scan exception:", err.message);
-    res.status(500).json({ error: "Failed: " + err.message });
+    return res.status(500).json({ error: "Failed: " + err.message });
   }
 });
 router.post("/text", async (req, res) => {
@@ -110,15 +110,15 @@ Return only the JSON array.` }
       })
     });
 
-    const data = await response.json();
+    const data = await response.json() as any;
     if (!response.ok) return res.status(500).json({ error: data.error?.message });
 
     const raw = data.choices?.[0]?.message?.content || "[]";
     const clean = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
-    res.json({ result: Array.isArray(parsed) ? parsed : [parsed] });
+    return res.json({ result: Array.isArray(parsed) ? parsed : [parsed] });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed: " + err.message });
+    return res.status(500).json({ error: "Failed: " + err.message });
   }
 });
 

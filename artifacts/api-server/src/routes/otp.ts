@@ -120,7 +120,7 @@ router.get("/status", (req, res) => {
   if (phone.length !== 10) return res.status(400).json({ error: "Valid 10-digit phone number required" });
   const rec = getOrInit(phone);
   const now = Date.now();
-  res.json({
+  return res.json({
     phone,
     invalidAttemptsToday: rec.invalidAttempts,
     attemptsLeft: Math.max(0, MAX_INVALID_PER_DAY - rec.invalidAttempts),

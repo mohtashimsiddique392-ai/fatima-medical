@@ -47,7 +47,7 @@ router.post("/admin/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
   const token = Buffer.from(`admin:${username}:${Date.now()}`).toString("base64");
-  res.json({ token, username: admin.username, role: "admin", phone: admin.phone });
+  return res.json({ token, username: admin.username, role: "admin", phone: admin.phone });
 });
 
 // Admin request OTP for password change
@@ -59,7 +59,7 @@ router.post("/admin/request-otp", async (req, res) => {
   const otp = generateOtp();
   otpStore[admin.username] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
 
-  res.json({ message: `OTP sent to ${admin.phone}. (Demo OTP: ${otp})`, phone: admin.phone });
+  return res.json({ message: `OTP sent to ${admin.phone}. (Demo OTP: ${otp})`, phone: admin.phone });
 });
 
 // Admin change password via OTP
@@ -74,7 +74,7 @@ router.post("/admin/change-password", async (req, res) => {
   }
   await db.update(adminTable).set({ password: newPassword }).where(eq(adminTable.username, username));
   delete otpStore[username];
-  res.json({ message: "Password changed successfully" });
+  return res.json({ message: "Password changed successfully" });
 });
 
 // Customer register
@@ -123,7 +123,7 @@ router.post("/customer/register", async (req, res) => {
   }
 
   const token = Buffer.from(`customer:${customer.id}:${Date.now()}`).toString("base64");
-  res.json({ token, id: customer.id, name: customer.name, phone: customer.phone, referralCode: customer.referralCode, referralCredits: Number(customer.referralCredits), role: "customer" });
+  return res.json({ token, id: customer.id, name: customer.name, phone: customer.phone, referralCode: customer.referralCode, referralCredits: Number(customer.referralCredits), role: "customer" });
 });
 
 // Customer login
@@ -137,7 +137,7 @@ router.post("/customer/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid phone or password" });
   }
   const token = Buffer.from(`customer:${customer.id}:${Date.now()}`).toString("base64");
-  res.json({ token, id: customer.id, name: customer.name, phone: customer.phone, referralCode: customer.referralCode, referralCredits: Number(customer.referralCredits), role: "customer" });
+  return res.json({ token, id: customer.id, name: customer.name, phone: customer.phone, referralCode: customer.referralCode, referralCredits: Number(customer.referralCredits), role: "customer" });
 });
 
 export default router;
