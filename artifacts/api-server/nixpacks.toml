@@ -8,4 +8,4 @@ cmds = ["npm install -g pnpm@10", "pnpm install --no-frozen-lockfile"]
 cmds = ["pnpm build"]
 
 [start]
-cmd = "node dist/index.js"
+cmd = "node --enable-source-maps ./dist/index.mjs"

@@ -1,12 +1,13 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { Pool } from "pg";
 
 const router = Router();
 
-const getPool = () => {
-  const { Pool } = require('/home/runner/workspace/node_modules/.pnpm/pg@8.20.0/node_modules/pg');
-  return new Pool({ connectionString: process.env.DATABASE_URL });
-};
+const getPool = () => new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 // ── Store Settings ──────────────────────────────────────────────
 router.get("/settings", async (_req, res) => {
