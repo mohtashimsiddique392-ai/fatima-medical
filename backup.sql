@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AQy54z75Cxt84qAs6UequhBkYdBaIfihfvlcm8agRrY12hrCQMROPsiCaPZFKYV
+\restrict y0s1pLxhUidFpO0TSFIYjsn8wPcJdG5orqQPn0wEE6y75TzeCc2RtmWo6UvoQ5s
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -30,9 +30,7 @@ CREATE TABLE public.admin (
     id integer NOT NULL,
     username character varying(50) NOT NULL,
     password text NOT NULL,
-    phone character varying(20) NOT NULL,
-    otp character varying(6),
-    otp_expires_at timestamp without time zone
+    phone character varying(20) NOT NULL
 );
 
 
@@ -72,7 +70,6 @@ CREATE TABLE public.customers (
     referral_code character varying(10) NOT NULL,
     referred_by integer,
     referral_credits numeric(10,2) DEFAULT '0'::numeric NOT NULL,
-    address text,
     created_at timestamp without time zone DEFAULT now() NOT NULL
 );
 
@@ -285,7 +282,8 @@ CREATE TABLE public.products (
     expiry_date date,
     batch_number character varying(50),
     manufacturer text,
-    cost_price numeric(10,2)
+    cost_price numeric(10,2),
+    salt_name text
 );
 
 
@@ -366,8 +364,8 @@ ALTER TABLE ONLY public.products ALTER COLUMN id SET DEFAULT nextval('public.pro
 -- Data for Name: admin; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.admin (id, username, password, phone, otp, otp_expires_at) FROM stdin;
-1	fatima04786	imran@04786	8081176774	\N	\N
+COPY public.admin (id, username, password, phone) FROM stdin;
+1	fatima04786	imran@04786	8081176774
 \.
 
 
@@ -375,10 +373,10 @@ COPY public.admin (id, username, password, phone, otp, otp_expires_at) FROM stdi
 -- Data for Name: customers; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.customers (id, name, phone, password, referral_code, referred_by, referral_credits, address, created_at) FROM stdin;
-1	Test Customer	9999999999	test123	7FKQTE	\N	0.00	\N	2026-04-20 06:47:35.567677
-2	Mohtashim	8687924003	Hello	UCESN7	\N	0.00	\N	2026-04-20 07:16:40.566864
-3	Rahul 	7860152188	h	G6MWA6	\N	0.00	\N	2026-04-21 08:27:24.073988
+COPY public.customers (id, name, phone, password, referral_code, referred_by, referral_credits, created_at) FROM stdin;
+1	Test Customer	9999999999	test123	7FKQTE	\N	0.00	2026-04-20 06:47:35.567677
+2	Mohtashim	8687924003	Hello	UCESN7	\N	0.00	2026-04-20 07:16:40.566864
+3	Rahul 	7860152188	h	G6MWA6	\N	0.00	2026-04-21 08:27:24.073988
 \.
 
 
@@ -424,15 +422,15 @@ COPY public.orders (id, customer_id, total_amount, payment_method, payment_statu
 -- Data for Name: products; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.products (id, name, description, price, category, image_url, stock, dosage, how_to_take, side_effects, requires_prescription, is_active, created_at, expiry_date, batch_number, manufacturer, cost_price) FROM stdin;
-4	Cetirizine 10mg	Antihistamine for allergy relief.	45.00	Allergy	\N	60	10mg once daily	Take once daily in the evening.	Drowsiness, dry mouth	f	t	2026-04-20 06:39:33.838353	2025-05-10	BT20240901	Dr. Reddy's	35.00
-5	Omeprazole 20mg	Acid reflux and heartburn relief.	80.00	Gastro	\N	45	20mg once daily	Take 30 min before breakfast.	Headache, nausea	f	t	2026-04-20 06:39:33.838353	2026-12-31	BT20241001	Abbott	65.00
-6	Ibuprofen 400mg	Anti-inflammatory pain relief.	55.00	Pain Relief	\N	75	400mg every 6-8 hrs	Take with food or milk.	Stomach upset	f	t	2026-04-20 06:39:33.838353	2025-03-20	BT20240701	Lupin	42.00
-7	Metformin 500mg	Diabetes management tablet.	120.00	Diabetes	\N	40	500mg with meals	Take with meals to reduce stomach upset.	Nausea initially	t	t	2026-04-20 06:39:33.838353	2026-06-30	BT20241101	USV	95.00
-8	Calcium + D3 Tablet	Bone health supplement.	165.00	Supplements	\N	55	1 tablet twice daily	Take with meals, 4-6 hours apart.	Constipation if overused	f	t	2026-04-20 06:39:33.838353	2027-01-15	BT20250101	Pfizer	130.00
-1	Paracetamol 500mg	Fever and mild pain relief tablets.	25.00	Pain Relief	\N	118	500mg	Take 1 tablet every 4-6 hours. Max 4 per day.	Rare: nausea	f	t	2026-04-20 06:39:33.838353	2025-12-15	BT20241201	Sun Pharma	18.00
-2	Amoxicillin 250mg	Prescription antibiotic course.	95.00	Antibiotic	\N	31	250mg 3x daily	Take with food every 8 hours. Complete full course.	Diarrhea, nausea	t	t	2026-04-20 06:39:33.838353	2024-11-01	BT20240801	Cipla	72.00
-3	Vitamin D3 1000IU	Daily vitamin D supplement.	140.00	Supplements	\N	7	1000 IU daily	Take one capsule daily with a meal.	Rare at normal doses	f	t	2026-04-20 06:39:33.838353	2026-08-30	BT20241501	Mankind	115.00
+COPY public.products (id, name, description, price, category, image_url, stock, dosage, how_to_take, side_effects, requires_prescription, is_active, created_at, expiry_date, batch_number, manufacturer, cost_price, salt_name) FROM stdin;
+4	Cetirizine 10mg	Antihistamine for allergy relief.	45.00	Allergy	\N	60	10mg once daily	Take once daily in the evening.	Drowsiness, dry mouth	f	t	2026-04-20 06:39:33.838353	2025-05-10	BT20240901	Dr. Reddy's	35.00	\N
+5	Omeprazole 20mg	Acid reflux and heartburn relief.	80.00	Gastro	\N	45	20mg once daily	Take 30 min before breakfast.	Headache, nausea	f	t	2026-04-20 06:39:33.838353	2026-12-31	BT20241001	Abbott	65.00	\N
+6	Ibuprofen 400mg	Anti-inflammatory pain relief.	55.00	Pain Relief	\N	75	400mg every 6-8 hrs	Take with food or milk.	Stomach upset	f	t	2026-04-20 06:39:33.838353	2025-03-20	BT20240701	Lupin	42.00	\N
+7	Metformin 500mg	Diabetes management tablet.	120.00	Diabetes	\N	40	500mg with meals	Take with meals to reduce stomach upset.	Nausea initially	t	t	2026-04-20 06:39:33.838353	2026-06-30	BT20241101	USV	95.00	\N
+8	Calcium + D3 Tablet	Bone health supplement.	165.00	Supplements	\N	55	1 tablet twice daily	Take with meals, 4-6 hours apart.	Constipation if overused	f	t	2026-04-20 06:39:33.838353	2027-01-15	BT20250101	Pfizer	130.00	\N
+1	Paracetamol 500mg	Fever and mild pain relief tablets.	25.00	Pain Relief	\N	118	500mg	Take 1 tablet every 4-6 hours. Max 4 per day.	Rare: nausea	f	t	2026-04-20 06:39:33.838353	2025-12-15	BT20241201	Sun Pharma	18.00	\N
+2	Amoxicillin 250mg	Prescription antibiotic course.	95.00	Antibiotic	\N	31	250mg 3x daily	Take with food every 8 hours. Complete full course.	Diarrhea, nausea	t	t	2026-04-20 06:39:33.838353	2024-11-01	BT20240801	Cipla	72.00	\N
+3	Vitamin D3 1000IU	Daily vitamin D supplement.	140.00	Supplements	\N	7	1000 IU daily	Take one capsule daily with a meal.	Rare at normal doses	f	t	2026-04-20 06:39:33.838353	2026-08-30	BT20241501	Mankind	115.00	\N
 \.
 
 
@@ -569,5 +567,5 @@ ALTER TABLE ONLY public.products
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AQy54z75Cxt84qAs6UequhBkYdBaIfihfvlcm8agRrY12hrCQMROPsiCaPZFKYV
+\unrestrict y0s1pLxhUidFpO0TSFIYjsn8wPcJdG5orqQPn0wEE6y75TzeCc2RtmWo6UvoQ5s
 
