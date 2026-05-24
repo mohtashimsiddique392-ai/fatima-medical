@@ -129,6 +129,19 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
+      <div className="flex gap-4 justify-center mt-3 flex-wrap">
+  <Link href="/privacy">
+    <span className="text-xs text-gray-400 hover:text-teal-600 cursor-pointer">Privacy Policy</span>
+  </Link>
+  <span className="text-xs text-gray-300">·</span>
+  <Link href="/terms">
+    <span className="text-xs text-gray-400 hover:text-teal-600 cursor-pointer">Terms of Service</span>
+  </Link>
+  <span className="text-xs text-gray-300">·</span>
+  <Link href="/refund">
+    <span className="text-xs text-gray-400 hover:text-teal-600 cursor-pointer">Refund Policy</span>
+  </Link>
+</div>
       <footer className="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
         <p className="font-semibold text-white mb-1">Fatima Medical Store</p>
         <p>Sector O, Mansarovar Yojna, Lucknow 226008 | +91 8081176774</p>

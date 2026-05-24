@@ -25,6 +25,9 @@ import AdminBilling from "@/pages/admin/Billing";
 import SubAdmins from "@/pages/admin/SubAdmins";
 import StoreSettings from "@/pages/admin/StoreSettings";
 import NotFound from "@/pages/not-found";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsOfService from "@/pages/TermsOfService";
+import RefundPolicy from "@/pages/RefundPolicy";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +57,9 @@ function AppRouter() {
     <>
       {showNavbar && <Navbar />}
       <Switch>
+        <Route path="/privacy" component={PrivacyPolicy} />
+<Route path="/terms" component={TermsOfService} />
+<Route path="/refund" component={RefundPolicy} />
         <Route path="/" component={Landing} />
         <Route path="/login" component={CustomerLogin} />
         <Route path="/register" component={CustomerRegister} />
