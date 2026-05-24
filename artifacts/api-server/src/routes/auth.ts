@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { customersTable, adminTable } from "@workspace/db";
@@ -43,7 +44,7 @@ router.post("/admin/login", async (req, res) => {
     return res.status(400).json({ error: "Username and password required" });
   }
   const [admin] = await db.select(adminCols).from(adminTable).where(eq(adminTable.username, username)).limit(1);
-  if (!admin || admin.password !== password) {
+  if (!admin || !(await bcrypt.compare(password, admin.password))) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
   const token = Buffer.from(`admin:${username}:${Date.now()}`).toString("base64");
@@ -103,10 +104,11 @@ router.post("/customer/register", async (req, res) => {
     attempts++;
   }
 
-  const [customer] = await db.insert(customersTable).values({
+  const hashedPassword = await bcrypt.hash(password, 10);
+const [customer] = await db.insert(customersTable).values({
     name,
     phone,
-    password,
+    password: hashedPassword,
     referralCode: myCode,
     referredBy: referredById,
     referralCredits: "0",
@@ -133,7 +135,7 @@ router.post("/customer/login", async (req, res) => {
     return res.status(400).json({ error: "Phone and password required" });
   }
   const [customer] = await db.select(customerCols).from(customersTable).where(eq(customersTable.phone, phone)).limit(1);
-  if (!customer || customer.password !== password) {
+  if (!customer || !(await bcrypt.compare(password, customer.password))) {
     return res.status(401).json({ error: "Invalid phone or password" });
   }
   const token = Buffer.from(`customer:${customer.id}:${Date.now()}`).toString("base64");
