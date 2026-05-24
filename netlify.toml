@@ -1,0 +1,7 @@
+[build]
+  base    = "."
+  command = "pnpm install --no-frozen-lockfile && pnpm --filter @workspace/medi-care run build"
+  publish = "artifacts/medi-care/dist"
+
+[build.environment]
+  PNPM_VERSION = "10"
