@@ -1,7 +1,12 @@
 [build]
   base    = "."
   command = "pnpm install --no-frozen-lockfile && pnpm --filter @workspace/medi-care run build"
-  publish = "artifacts/medi-care/dist"
+  publish = "artifacts/medi-care/dist/public"
 
 [build.environment]
   PNPM_VERSION = "10"
+
+[[redirects]]
+  from = "/*"
+  to   = "/index.html"
+  status = 200
