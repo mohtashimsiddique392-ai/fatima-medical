@@ -84,11 +84,27 @@ export default function AdminCatalogue() {
 
   // Handle product image upload (for admin to attach to product)
   const handleProductImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const base64 = await fileToBase64(file);
-    setForm(p => ({ ...p, imageUrl: `data:image/jpeg;base64,${base64}` }));
-    if (productImageRef.current) productImageRef.current.value = "";
+  const file = e.target.files?.[0]; if (!file) return;
+  // Compress image before saving
+  const canvas = document.createElement("canvas");
+  const img = document.createElement("img");
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    img.onload = () => {
+      const MAX = 400;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = (h * MAX) / w; w = MAX; }
+      if (h > MAX) { w = (w * MAX) / h; h = MAX; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d")?.drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL("image/jpeg", 0.6);
+      setForm(p => ({ ...p, imageUrl: compressed }));
+    };
+    img.src = ev.target?.result as string;
   };
+  reader.readAsDataURL(file);
+  if (productImageRef.current) productImageRef.current.value = "";
+};
 
   const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
