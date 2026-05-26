@@ -470,7 +470,7 @@ export default function AdminCatalogue() {
       "Vitamin & Supplement", "Syrup", "Injection", "Cream & Ointment",
       "Baby Care", "Surgical & Dressing", "Hygiene & Sanitizer",
       "Health Drink & Nutrition", "Ayurvedic", "Eye & Ear Drops",
-      "Cardiac & BP", "Skin Care", "Women Health", "General OTC"
+      "Cardiac & BP", "Skin Care", "Women Health", "Hormones & Steroids", "General OTC"
     ].map(c => <option key={c} value={c}>{c}</option>)}
   </select>
 </div>
