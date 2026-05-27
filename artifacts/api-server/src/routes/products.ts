@@ -50,7 +50,7 @@ router.post("/", async (req, res) => {
   if (!name || !price || !category) return res.status(400).json({ error: "Name, price, and category required" });
   const [product] = await db.insert(productsTable).values({
     name,
-    (productsTable as any).saltName !== undefined ? { saltName: saltName || null } : {},
+    ...((productsTable as any).saltName !== undefined ? { saltName: saltName || null } : {}),
     description,
     price: String(price),
     category,

@@ -1,3 +1,4 @@
+const { addToCart, cartCount, cart } = useAuth();
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
@@ -53,10 +54,16 @@ export default function Store() {
   };
 
   const handleAdd = (p: Product) => {
-    addToCart({ id: p.id, name: p.name, price: Number(p.price), imageUrl: p.imageUrl });
-    setAdded(p.id);
-    setTimeout(() => setAdded(null), 1500);
-  };
+  if (p.stock === 0) return;
+  const cartItem = cart?.find((c: any) => c.id === p.id);
+  if (cartItem && cartItem.quantity >= p.stock) {
+    alert(`Only ${p.stock} in stock`);
+    return;
+  }
+  addToCart({ id: p.id, name: p.name, price: Number(p.price), imageUrl: p.imageUrl, stock: p.stock });
+  setAdded(p.id);
+  setTimeout(() => setAdded(null), 1500);
+};
 
   return (
     <div className="min-h-screen bg-gray-50">

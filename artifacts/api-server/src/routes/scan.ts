@@ -1,7 +1,53 @@
 import { Router } from "express";
+import { Pool } from "pg";
 const router = Router();
 
+const getPool = () => new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Save medicine to cache
+async function saveMedicineCache(nameKey: string, category: string, imageUrl: string, saltName: string) {
+  const pool = getPool();
+  try {
+    await pool.query(`
+      INSERT INTO medicine_cache (name_key, category, image_url, salt_name)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (name_key) DO UPDATE SET
+        category = EXCLUDED.category,
+        image_url = EXCLUDED.image_url,
+        updated_at = NOW()
+    `, [nameKey.toLowerCase().trim(), category, imageUrl, saltName]);
+  } catch (e) {
+    console.log("Cache save error:", e);
+  } finally { pool.end(); }
+}
+
+// Check medicine cache first
+async function checkMedicineCache(name: string, saltName: string): Promise<{ category: string; imageUrl: string } | null> {
+  const pool = getPool();
+  try {
+    const key = (name + " " + saltName).toLowerCase().trim();
+    const { rows } = await pool.query(
+      "SELECT category, image_url FROM medicine_cache WHERE name_key = $1 OR name_key = $2 LIMIT 1",
+      [name.toLowerCase().trim(), key]
+    );
+    if (rows[0]) return { category: rows[0].category, imageUrl: rows[0].image_url || "" };
+    return null;
+  } catch { return null; }
+  finally { pool.end(); }
+}
+
+// AI lookup for category and image — always runs
 async function lookupMedicineDetails(name: string, saltName: string, apiKey: string): Promise<{ category: string; imageUrl: string }> {
+  // Check cache first
+  const cached = await checkMedicineCache(name, saltName);
+  if (cached) {
+    console.log("Cache hit for:", name, "->", cached.category);
+    return cached;
+  }
+
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -9,55 +55,59 @@ async function lookupMedicineDetails(name: string, saltName: string, apiKey: str
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: "You are a pharmacy expert. Return ONLY valid JSON, no other text." },
-          { role: "user", content: `Medicine brand name: "${name}", Salt/Composition: "${saltName}"
+          { role: "system", content: "You are a clinical pharmacist. Classify medicines by their drug class. Return ONLY valid JSON." },
+          { role: "user", content: `Medicine: "${name}"
+Salt/Composition: "${saltName}"
 
-Identify the correct pharmacy category based on the drug class, mechanism and therapeutic use.
-Also provide a Google image search URL for this medicine.
+Task: Identify the correct pharmacy category based on drug class and therapeutic use.
 
-Return ONLY this JSON object:
+IMPORTANT RULES:
+- Oval-G contains Norgestrel + Ethinyl Estradiol = Hormones & Steroids (oral contraceptive)
+- Any oral contraceptive pill = Hormones & Steroids
+- Any corticosteroid (prednisolone, dexamethasone, betamethasone) = Hormones & Steroids  
+- Any thyroid hormone (levothyroxine, thyroxine) = Hormones & Steroids
+- Schedule H drugs that are hormones = Hormones & Steroids
+- Paracetamol/Acetaminophen based = Pain Relief
+- Any NSAID (nimesulide, ibuprofen, diclofenac, aceclofenac) = Pain Relief
+- Any antibiotic = Antibiotic
+- Omeprazole/Pantoprazole/antacid = Gastro
+- Cetirizine/antihistamine = Allergy
+- Metformin/insulin/antidiabetic = Diabetes
+- Vitamins/minerals/supplements = Vitamin & Supplement
+- Any liquid medicine = Syrup
+- Any injectable = Injection
+- Any topical gel/cream = Cream & Ointment
+- Baby products = Baby Care
+- Cotton/bandage/surgical = Surgical & Dressing
+- Sanitizer/dettol/soap = Hygiene & Sanitizer
+- ORS/protein drink/eno = Health Drink & Nutrition
+- Ayurvedic/herbal = Ayurvedic
+- Eye/ear drops = Eye & Ear Drops
+- BP/heart/cholesterol medicines = Cardiac & BP
+- Antifungal skin treatments = Skin Care
+- Pregnancy/feminine/contraceptive non-hormonal = Women Health
+
+Return ONLY:
 {
-  "category": "Pain Relief",
-  "imageUrl": "https://www.google.com/search?q=Dolo+650mg+paracetamol+tablet&tbm=isch"
-}
-
-Choose category from ONLY these options based on drug class:
-Pain Relief = paracetamol/acetaminophen, ibuprofen, nimesulide, diclofenac, aceclofenac, aspirin, tramadol, ketorolac, mefenamic acid, naproxen, any NSAID analgesic antipyretic
-Antibiotic = amoxicillin, azithromycin, ciprofloxacin, metronidazole, doxycycline, cefixime, cefpodoxime, ampicillin, clarithromycin, levofloxacin, any antibacterial antimicrobial
-Allergy = cetirizine, levocetirizine, fexofenadine, loratadine, montelukast, chlorpheniramine, any antihistamine anti-allergic
-Gastro = omeprazole, pantoprazole, rabeprazole, esomeprazole, domperidone, ondansetron, ranitidine, famotidine, metoclopramide, any antacid PPI antiemetic
-Diabetes = metformin, glimepiride, sitagliptin, vildagliptin, dapagliflozin, empagliflozin, insulin, glipizide, any antidiabetic
-Vitamin & Supplement = vitamin D3, B12, B complex, calcium, iron, zinc, folic acid, magnesium, multivitamin, any nutritional supplement
-Syrup = any medicine in liquid suspension syrup form
-Injection = any injectable vial ampoule IV infusion
-Cream & Ointment = any topical gel cream lotion ointment
-Baby Care = diapers baby powder baby soap baby oil baby food baby lotion
-Surgical & Dressing = bandage cotton gauze surgical tape gloves syringe spirit
-Hygiene & Sanitizer = hand sanitizer dettol savlon soap handwash disinfectant
-Health Drink & Nutrition = eno ORS electral glucose D protein powder horlicks boost
-Ayurvedic = herbal ayurvedic patanjali dabur himalaya herbal
-Eye & Ear Drops = eye drops ear drops ophthalmic otic solution
-Cardiac & BP = amlodipine atenolol metoprolol ramipril losartan telmisartan atorvastatin rosuvastatin any antihypertensive cardiac
-Skin Care = antifungal fluconazole ketoconazole terbinafine clotrimazole miconazole any dermatological
-Women Health = oral contraceptive pill progesterone estrogen mefenamic acid dysmenorrhea pregnancy supplement feminine hygiene
-Hormones & Steroids = any hormone steroid corticosteroid testosterone estrogen progesterone thyroid levothyroxine prednisolone dexamethasone betamethasone oval-g letrozole clomiphene any Schedule H hormonal drug
-General OTC = anything that truly does not fit above
-
-For imageUrl use: https://www.google.com/search?q=MEDICINE_NAME+medicine+tablet&tbm=isch
-Replace MEDICINE_NAME with the actual medicine name URL encoded.` }
+  "category": "exact category name",
+  "imageUrl": "https://www.google.com/search?q=${encodeURIComponent(name)}+medicine&tbm=isch"
+}` }
         ],
-        max_tokens: 150,
-        temperature: 0.1
+        max_tokens: 100,
+        temperature: 0.0
       })
     });
     const data = await res.json() as any;
     const text = data.choices?.[0]?.message?.content || "{}";
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
-    return {
+    const result = {
       category: parsed.category || "General OTC",
       imageUrl: parsed.imageUrl || `https://www.google.com/search?q=${encodeURIComponent(name + " medicine")}&tbm=isch`
     };
+    // Save to cache
+    await saveMedicineCache(name, result.category, result.imageUrl, saltName);
+    return result;
   } catch {
     return {
       category: "General OTC",
@@ -77,8 +127,6 @@ function normalizeDate(d: string): string {
   return d;
 }
 
-const VALID_CATEGORIES = ["Pain Relief","Antibiotic","Allergy","Gastro","Diabetes","Vitamin & Supplement","Syrup","Injection","Cream & Ointment","Baby Care","Surgical & Dressing","Hygiene & Sanitizer","Health Drink & Nutrition","Ayurvedic","Eye & Ear Drops","Cardiac & BP","Skin Care","Women Health","Hormones & Steroids"];
-
 router.post("/", async (req, res) => {
   const { image, type } = req.body;
   if (!image) return res.status(400).json({ error: "Image required" });
@@ -86,40 +134,40 @@ router.post("/", async (req, res) => {
   if (!apiKey) return res.status(500).json({ error: "API key not configured" });
 
   const prompt = type === "bill"
-    ? `Wholesaler medicine bill image. Extract ALL medicines. Return ONLY JSON array:
+    ? `Wholesaler medicine bill. Extract ALL medicines. Return ONLY JSON array:
 [{
-  "name": "BRAND name only e.g. Essthro Dolo Crocin Augmentin",
-  "saltName": "full salt/composition e.g. Azithromycin Tablets IP 250mg",
-  "price": "MRP number as string",
+  "name": "BRAND name only e.g. Essthro Dolo Crocin Oval-G",
+  "saltName": "full composition e.g. Azithromycin IP 250mg or Norgestrel 0.5mg + Ethinyl Estradiol 0.05mg",
+  "price": "MRP number",
   "stock": 10,
-  "category": "best category",
-  "batchNumber": "exact batch number printed e.g. BT241098 or empty",
-  "expiryDate": "MM/YYYY format ONLY e.g. 09/2026 never DD/MM/YYYY",
+  "category": "best guess category",
+  "batchNumber": "exact batch printed e.g. BT241098",
+  "expiryDate": "MM/YYYY e.g. 09/2026 NEVER DD/MM/YYYY",
   "manufacturer": "company name",
-  "dosage": "dosage if visible",
+  "dosage": "if visible",
   "requiresPrescription": false
 }]`
-    : `Medicine package image. 
-BRAND = large trade name e.g. Essthro Dolo Oval-G
-SALT = composition e.g. Azithromycin IP 250mg Norgestrel Ethinyl Estradiol
+    : `Medicine package image.
+BRAND = large trade name e.g. Essthro, Dolo, Oval-G, Augmentin
+SALT = composition e.g. Azithromycin IP 250mg, Norgestrel+Ethinyl Estradiol
 
-DATE RULES - CRITICAL:
-EXP date on pack is MM/YYYY e.g. 09/2026 - return as MM/YYYY ONLY
-MFG date on pack is MM/YYYY e.g. 10/2024 - return as MM/YYYY ONLY  
-NEVER return YYYY-MM-DD or DD/MM/YYYY
-Batch number is alphanumeric printed as B.No or Batch e.g. CPT241098
+CRITICAL DATE RULES:
+- EXP printed as MM/YYYY → return as MM/YYYY e.g. 09/2026
+- MFG printed as MM/YYYY → return as MM/YYYY e.g. 10/2024
+- NEVER return YYYY-MM-DD or DD/MM/YYYY
+- Batch = B.No or Batch number e.g. CPT241098 copy exactly
 
 Return ONLY JSON:
 {
-  "name": "BRAND name only",
-  "saltName": "full salt with strength",
-  "category": "best category",
-  "price": "MRP number",
+  "name": "BRAND only",
+  "saltName": "full salt+strength",
+  "category": "best guess",
+  "price": "MRP",
   "dosage": "dosage",
   "howToTake": "how to take",
   "sideEffects": "side effects",
   "manufacturer": "company",
-  "batchNumber": "exact batch e.g. CPT241098",
+  "batchNumber": "exact e.g. CPT241098",
   "expiryDate": "MM/YYYY only",
   "requiresPrescription": true or false,
   "stock": 10
@@ -143,21 +191,22 @@ Return ONLY JSON:
     const data = await response.json() as any;
     if (!response.ok) return res.status(500).json({ error: data.error?.message || "AI error" });
 
-    const text = data.choices?.[0]?.message?.content || "";
-    const clean = text.replace(/```json|```/g, "").trim();
+    const rawText = data.choices?.[0]?.message?.content || "";
+    const clean = rawText.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
+    // Always run second AI lookup for accurate category + image
     if (Array.isArray(parsed)) {
       for (const item of parsed) {
         item.expiryDate = normalizeDate(item.expiryDate || "");
         const details = await lookupMedicineDetails(item.name || "", item.saltName || "", apiKey);
-        if (!VALID_CATEGORIES.includes(item.category)) item.category = details.category;
+        item.category = details.category;
         item.suggestedImageUrl = details.imageUrl;
       }
     } else {
       parsed.expiryDate = normalizeDate(parsed.expiryDate || "");
       const details = await lookupMedicineDetails(parsed.name || "", parsed.saltName || "", apiKey);
-      if (!VALID_CATEGORIES.includes(parsed.category)) parsed.category = details.category;
+      parsed.category = details.category;
       parsed.suggestedImageUrl = details.imageUrl;
     }
 
@@ -181,9 +230,9 @@ router.post("/text", async (req, res) => {
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: "Pharmacy data extraction. Return only valid JSON." },
-          { role: "user", content: `Extract medicines from this bill. Return ONLY JSON array:
-[{"name":"BRAND name","saltName":"salt with strength","price":"number","stock":10,"category":"","batchNumber":"","expiryDate":"MM/YYYY","manufacturer":"","dosage":"","requiresPrescription":false}]
+          { role: "system", content: "Pharmacy bill extraction. Return only valid JSON." },
+          { role: "user", content: `Extract medicines from bill. Return ONLY JSON array:
+[{"name":"BRAND","saltName":"salt+strength","price":"number","stock":10,"category":"","batchNumber":"","expiryDate":"MM/YYYY","manufacturer":"","dosage":"","requiresPrescription":false}]
 
 Bill:
 ${text}
@@ -204,7 +253,7 @@ Return only JSON array.` }
     for (const item of result) {
       item.expiryDate = normalizeDate(item.expiryDate || "");
       const details = await lookupMedicineDetails(item.name || "", item.saltName || "", apiKey);
-      if (!VALID_CATEGORIES.includes(item.category)) item.category = details.category;
+      item.category = details.category;
       item.suggestedImageUrl = details.imageUrl;
     }
 

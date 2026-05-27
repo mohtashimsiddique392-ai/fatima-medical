@@ -17,6 +17,7 @@ interface CartItem {
   price: number;
   quantity: number;
   imageUrl?: string;
+  stock?: number;
 }
 
 interface AuthContextType {
@@ -63,18 +64,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const addToCart = (item: Omit<CartItem, "quantity">) => {
-    setCart(prev => {
-      const existing = prev.find(c => c.id === item.id);
-      if (existing) return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
-      return [...prev, { ...item, quantity: 1 }];
-    });
-  };
+  setCart(prev => {
+    const existing = prev.find(c => c.id === item.id);
+    if (existing) {
+      // Don't exceed available stock
+      const maxStock = item.stock || existing.stock || 999;
+      if (existing.quantity >= maxStock) return prev;
+      return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+    }
+    return [...prev, { ...item, quantity: 1 }];
+  });
+};
 
   const removeFromCart = (id: number) => setCart(prev => prev.filter(c => c.id !== id));
   const updateQty = (id: number, qty: number) => {
-    if (qty <= 0) return removeFromCart(id);
-    setCart(prev => prev.map(c => c.id === id ? { ...c, quantity: qty } : c));
-  };
+  if (qty <= 0) return removeFromCart(id);
+  setCart(prev => prev.map(c => {
+    if (c.id !== id) return c;
+    const maxStock = c.stock || 999;
+    const safeQty = Math.min(qty, maxStock);
+    return { ...c, quantity: safeQty };
+  }));
+};
   const clearCart = () => setCart([]);
   const cartTotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
   const cartCount = cart.reduce((s, c) => s + c.quantity, 0);
