@@ -5,7 +5,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-app.use(helmet({ contentSecurityPolicy: false }));
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
@@ -18,7 +18,7 @@ const authLimiter = rateLimit({
   message: { error: "Too many login attempts, please try again in 15 minutes" }
 });
 const app: Express = express();
-
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
   pinoHttp({
     logger,
@@ -49,7 +49,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(generalLimiter);
 app.use("/api/auth", authLimiter);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+
 
 app.use("/api", router);
 
