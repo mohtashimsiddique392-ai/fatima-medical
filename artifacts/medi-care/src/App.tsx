@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import Landing from "@/pages/Landing";
 import CustomerLogin from "@/pages/CustomerLogin";
@@ -58,8 +59,8 @@ function AppRouter() {
       {showNavbar && <Navbar />}
       <Switch>
         <Route path="/privacy" component={PrivacyPolicy} />
-<Route path="/terms" component={TermsOfService} />
-<Route path="/refund" component={RefundPolicy} />
+        <Route path="/terms" component={TermsOfService} />
+        <Route path="/refund" component={RefundPolicy} />
         <Route path="/" component={Landing} />
         <Route path="/login" component={CustomerLogin} />
         <Route path="/register" component={CustomerRegister} />
@@ -88,14 +89,16 @@ function AppRouter() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AppRouter />
-        </WouterRouter>
-        <Toaster />
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AppRouter />
+          </WouterRouter>
+          <Toaster />
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
