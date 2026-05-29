@@ -16,6 +16,7 @@ export default defineConfig({
     tailwindcss(),
     runtimeErrorOverlay(),
     VitePWA({
+      selfDestroying: true,
       registerType: "autoUpdate",
       injectRegister: "auto",
       includeAssets: [

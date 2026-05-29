@@ -14,10 +14,14 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
 };
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-auth.languageCode = "en";
+const firebaseReady = !!firebaseConfig.apiKey && !!firebaseConfig.appId;
 
+const app = firebaseReady
+  ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig))
+  : null;
+
+export const auth = app ? getAuth(app) : null;
+if (auth) auth.languageCode = "en";
 let recaptchaVerifier: RecaptchaVerifier | null = null;
 
 export function getOrCreateRecaptcha(containerId: string): RecaptchaVerifier {
