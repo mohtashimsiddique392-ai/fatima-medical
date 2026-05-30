@@ -1,11 +1,3 @@
-# Cloudflare Pages build configuration
-# This file is read by Cloudflare Pages and overrides dashboard build settings.
-
+# Cloudflare Pages configuration
 name = "fatima-medical"
 pages_build_output_dir = "artifacts/medi-care/dist/public"
-
-[env.production.build]
-command = "pnpm install --no-frozen-lockfile && pnpm --filter @workspace/medi-care run build"
-
-[build]
-command = "pnpm install --no-frozen-lockfile && pnpm --filter @workspace/medi-care run build"
