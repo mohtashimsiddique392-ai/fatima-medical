@@ -1,4 +1,3 @@
-const { addToCart, cartCount, cart } = useAuth();
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
@@ -28,8 +27,9 @@ const CAT_COLORS: Record<string, string> = {
   "Women Health": "bg-pink-100 text-pink-700",
   "General OTC": "bg-gray-100 text-gray-600",
 };
+
 export default function Store() {
-  const { addToCart, cartCount } = useAuth();
+  const { addToCart, cartCount, cart } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -54,16 +54,16 @@ export default function Store() {
   };
 
   const handleAdd = (p: Product) => {
-  if (p.stock === 0) return;
-  const cartItem = cart?.find((c: any) => c.id === p.id);
-  if (cartItem && cartItem.quantity >= p.stock) {
-    alert(`Only ${p.stock} in stock`);
-    return;
-  }
-  addToCart({ id: p.id, name: p.name, price: Number(p.price), imageUrl: p.imageUrl, stock: p.stock });
-  setAdded(p.id);
-  setTimeout(() => setAdded(null), 1500);
-};
+    if (p.stock === 0) return;
+    const cartItem = cart?.find((c: any) => c.id === p.id);
+    if (cartItem && cartItem.quantity >= p.stock) {
+      alert(`Only ${p.stock} in stock`);
+      return;
+    }
+    addToCart({ id: p.id, name: p.name, price: Number(p.price), imageUrl: p.imageUrl, stock: p.stock });
+    setAdded(p.id);
+    setTimeout(() => setAdded(null), 1500);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -107,7 +107,6 @@ export default function Store() {
           <div className="grid md:grid-cols-3 gap-4">
             {products.map(p => (
               <div key={p.id} className="bg-white rounded-xl border border-gray-100 hover:border-teal-200 hover:shadow-sm transition-all overflow-hidden">
-                {/* Medicine Image */}
                 {p.imageUrl ? (
                   <img src={p.imageUrl} alt={p.name}
                     className="w-full h-36 object-cover"
@@ -151,7 +150,6 @@ export default function Store() {
         )}
       </div>
 
-      {/* Medicine Info Modal */}
       {selected && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
           <div className="bg-white rounded-2xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
