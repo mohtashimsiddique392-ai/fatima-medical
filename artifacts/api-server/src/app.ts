@@ -40,10 +40,18 @@ app.use(
 );
 app.use(cors({
   origin: [
-    process.env.FRONTEND_URL || "http://localhost:5173", "https://fatima-medical.pages.dev",
+    process.env.FRONTEND_URL || "http://localhost:5173",
+    "https://fatima-medical-store.netlify.app",
+    "https://fatima-medical.pages.dev",
+    /\.fatima-medical\.pages\.dev$/,
   ],
-  credentials: true
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+// Handle preflight requests
+app.options("*", cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(generalLimiter);
 app.use("/api/auth", authLimiter);
