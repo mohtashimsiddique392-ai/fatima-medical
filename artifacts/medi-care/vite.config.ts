@@ -74,10 +74,9 @@ export default defineConfig({
         "..",
         "attached_assets",
       ),
-      // Force all packages to use the same React instance.
-      // This fixes "Cannot read properties of null (reading 'useContext')"
-      // caused by @workspace/api-client-react bundling its own React copy
-      // via @tanstack/react-query.
+      // Force single React instance to prevent "Cannot read properties of null
+      // (reading 'useContext')" caused by @workspace/api-client-react pulling
+      // in its own copy of React via @tanstack/react-query.
       "react": path.resolve(import.meta.dirname, "node_modules/react"),
       "react-dom": path.resolve(import.meta.dirname, "node_modules/react-dom"),
     },
