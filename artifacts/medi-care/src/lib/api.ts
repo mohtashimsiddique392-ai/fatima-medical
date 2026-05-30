@@ -5,11 +5,14 @@ export async function apiFetch(path: string, options?: RequestInit) {
     headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Request failed");
+
+  // Only parse JSON if there's actually a body
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : {};
+
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
-
 export const api = {
   // Auth
   adminLogin: (body: { username: string; password: string }) =>
