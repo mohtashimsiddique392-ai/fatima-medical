@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || "/api";
+const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
 
 export async function apiFetch(path: string, options?: RequestInit) {
   const res = await fetch(`${BASE}${path}`, {
