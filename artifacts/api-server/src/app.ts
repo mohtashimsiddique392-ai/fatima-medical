@@ -42,6 +42,8 @@ app.use(cors({
   origin: [
     process.env.FRONTEND_URL || "http://localhost:5173",
     "https://fatima-medical-store.netlify.app",
+    /\.fatima-medical\.pages\.dev$/,
+    "https://fatima-medical.pages.dev",
     "https://fatima-medical.pages.dev",
     /\.fatima-medical\.pages\.dev$/,
   ],
