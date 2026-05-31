@@ -189,7 +189,7 @@ Return ONLY JSON:
     });
 
     const data = await response.json() as any;
-    if (!response.ok) return res.status(500).json({ error: data.error?.message || "AI error" });
+    if (!response.ok) return res.status(500).json({ error: data.error?.message || "AI error", details: data.error });
 
     const rawText = data.choices?.[0]?.message?.content || "";
     const clean = rawText.replace(/```json|```/g, "").trim();
@@ -213,7 +213,7 @@ Return ONLY JSON:
     res.json({ result: parsed });
   } catch (err: any) {
     console.error("Scan error:", err.message);
-    res.status(500).json({ error: "Failed: " + err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
