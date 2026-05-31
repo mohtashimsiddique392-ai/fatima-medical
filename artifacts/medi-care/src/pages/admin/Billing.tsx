@@ -133,7 +133,7 @@ export default function AdminBilling() {
     const file = e.target.files?.[0]; if (!file) return;
     try {
       const base64 = await fileToBase64(file);
-      const res = await fetch("/api/scan", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api"}/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64, type: "batch" })

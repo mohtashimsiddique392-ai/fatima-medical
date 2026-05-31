@@ -153,7 +153,7 @@ export default function AdminCatalogue() {
         const data = await api.scanImage({ image: base64, type: "bill" });
         parsed = Array.isArray(data.result) ? data.result : [data.result];
       } else {
-        const res = await fetch("/api/scan/text", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api"}/scan/text`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: billText })

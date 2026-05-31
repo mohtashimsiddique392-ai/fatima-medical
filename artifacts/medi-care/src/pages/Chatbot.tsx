@@ -28,7 +28,8 @@ export default function Chatbot() {
     const history = messages.slice(1).map(m => ({ role: m.role, text: m.text }));
 
     try {
-      const res = await fetch("/api/chat", {
+      const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
+const res = await fetch(`${BASE}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
