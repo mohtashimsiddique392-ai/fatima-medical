@@ -17,24 +17,28 @@ function expiryStatus(date?: string) {
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const MAX = 1024;
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round((height / width) * MAX); width = MAX; }
-        else { width = Math.round((width / height) * MAX); height = MAX; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.75).split(",")[1]);
+    const canvas = document.createElement("canvas");
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = document.createElement("img");
+      img.onload = () => {
+        const MAX = 1024;
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round((h / w) * MAX); w = MAX; }
+          else { w = Math.round((w / h) * MAX); h = MAX; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.75).split(",")[1]);
+      };
+      img.onerror = reject;
+      img.src = ev.target?.result as string;
     };
-    img.onerror = reject;
-    img.src = url;
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 }
 export default function AdminCatalogue() {
