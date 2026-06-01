@@ -93,8 +93,8 @@ Return ONLY:
   "imageUrl": "https://www.google.com/search?q=${encodeURIComponent(name)}+medicine&tbm=isch"
 }` }
         ],
-        max_tokens: 100,
-        temperature: 0.0
+        max_tokens: 1000,
+        temperature: 0.1
       })
     });
     const data = await res.json() as any;
@@ -194,10 +194,9 @@ Return ONLY JSON:
     if (!response.ok) return res.status(500).json({ error: data.error?.message || "AI error", details: data.error });
 
     const rawText = data.choices?.[0]?.message?.content || "";
-    const jsonMatch = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-if (!jsonMatch) throw new Error("No JSON found in AI response");
-const clean = jsonMatch[0].trim();
-const parsed = JSON.parse(clean);
+    const jsonMatch = rawText.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+    if (!jsonMatch) throw new Error("No JSON found in AI response: " + rawText.slice(0, 100));
+    const parsed = JSON.parse(jsonMatch[0].trim());
     // Always run second AI lookup for accurate category + image
     if (Array.isArray(parsed)) {
       for (const item of parsed) {
@@ -249,8 +248,9 @@ Return only JSON array.` }
     const data = await response.json() as any;
     if (!response.ok) return res.status(500).json({ error: data.error?.message });
     const raw = data.choices?.[0]?.message?.content || "[]";
-    const clean = raw.replace(/```json|```/g, "").trim();
-    const arr = JSON.parse(clean);
+    const jsonMatch2 = raw.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+    if (!jsonMatch2) throw new Error("No JSON in response: " + raw.slice(0, 100));
+    const arr = JSON.parse(jsonMatch2[0].trim());
     const result = Array.isArray(arr) ? arr : [arr];
 
     for (const item of result) {
