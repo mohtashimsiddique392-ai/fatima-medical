@@ -137,8 +137,8 @@ export default function AdminCatalogue() {
       }));
       setScanMsg("✓ AI scan complete! Review details and image below then save.");
       setShowForm(true);
-    } catch {
-      setScanMsg("AI scan failed. Please try again or add manually.");
+    } catch (err: any) {
+      setScanMsg("AI scan failed: " + (err?.message || String(err)));
       setShowForm(true);
     } finally {
       setAiProcessing(false);
@@ -177,8 +177,8 @@ export default function AdminCatalogue() {
       setBulkProducts(parsed);
       setShowBulk(true);
       setScanMsg(`✓ Found ${parsed.length} products from bill. Review and save each one.`);
-    } catch {
-      setScanMsg("AI processing failed. Please try again.");
+    } catch (err: any) {
+      setScanMsg("AI processing failed: " + (err?.message || String(err)));
       setShowWholesalerForm(true);
     } finally {
       setAiProcessing(false);
