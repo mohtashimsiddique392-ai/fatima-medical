@@ -99,8 +99,10 @@ Return ONLY:
     });
     const data = await res.json() as any;
     const text = data.choices?.[0]?.message?.content || "{}";
-    const clean = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(clean);
+    const jsonMatch = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+if (!jsonMatch) throw new Error("No JSON found in AI response");
+const clean = jsonMatch[0].trim();
+const parsed = JSON.parse(clean);
     const result = {
       category: parsed.category || "General OTC",
       imageUrl: parsed.imageUrl || `https://www.google.com/search?q=${encodeURIComponent(name + " medicine")}&tbm=isch`
@@ -192,9 +194,10 @@ Return ONLY JSON:
     if (!response.ok) return res.status(500).json({ error: data.error?.message || "AI error", details: data.error });
 
     const rawText = data.choices?.[0]?.message?.content || "";
-    const clean = rawText.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(clean);
-
+    const jsonMatch = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+if (!jsonMatch) throw new Error("No JSON found in AI response");
+const clean = jsonMatch[0].trim();
+const parsed = JSON.parse(clean);
     // Always run second AI lookup for accurate category + image
     if (Array.isArray(parsed)) {
       for (const item of parsed) {
