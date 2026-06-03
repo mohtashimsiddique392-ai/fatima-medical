@@ -1,53 +1,7 @@
 import { Router } from "express";
-import { Pool } from "pg";
 const router = Router();
 
-const getPool = () => new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-// Save medicine to cache
-async function saveMedicineCache(nameKey: string, category: string, imageUrl: string, saltName: string) {
-  const pool = getPool();
-  try {
-    await pool.query(`
-      INSERT INTO medicine_cache (name_key, category, image_url, salt_name)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (name_key) DO UPDATE SET
-        category = EXCLUDED.category,
-        image_url = EXCLUDED.image_url,
-        updated_at = NOW()
-    `, [nameKey.toLowerCase().trim(), category, imageUrl, saltName]);
-  } catch (e) {
-    console.log("Cache save error:", e);
-  } finally { pool.end(); }
-}
-
-// Check medicine cache first
-async function checkMedicineCache(name: string, saltName: string): Promise<{ category: string; imageUrl: string } | null> {
-  const pool = getPool();
-  try {
-    const key = (name + " " + saltName).toLowerCase().trim();
-    const { rows } = await pool.query(
-      "SELECT category, image_url FROM medicine_cache WHERE name_key = $1 OR name_key = $2 LIMIT 1",
-      [name.toLowerCase().trim(), key]
-    );
-    if (rows[0]) return { category: rows[0].category, imageUrl: rows[0].image_url || "" };
-    return null;
-  } catch { return null; }
-  finally { pool.end(); }
-}
-
-// AI lookup for category and image — always runs
 async function lookupMedicineDetails(name: string, saltName: string, apiKey: string): Promise<{ category: string; imageUrl: string }> {
-  // Check cache first
-  const cached = await checkMedicineCache(name, saltName);
-  if (cached) {
-    console.log("Cache hit for:", name, "->", cached.category);
-    return cached;
-  }
-
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -55,79 +9,61 @@ async function lookupMedicineDetails(name: string, saltName: string, apiKey: str
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: "You are a clinical pharmacist. Classify medicines by their drug class. Return ONLY valid JSON." },
-          { role: "user", content: `Medicine: "${name}"
-Salt/Composition: "${saltName}"
+          { role: "system", content: "You are a pharmacy expert. Return ONLY valid JSON, no other text." },
+          { role: "user", content: `Medicine: "${name}", Salt: "${saltName}"
+Choose category from ONLY these (pick the best match by drug class):
+Pain Relief = paracetamol ibuprofen nimesulide diclofenac aceclofenac aspirin tramadol mefenamic acid any NSAID analgesic
+Antibiotic = amoxicillin azithromycin ciprofloxacin metronidazole doxycycline cefixime any antibacterial
+Allergy = cetirizine levocetirizine fexofenadine loratadine montelukast any antihistamine
+Gastro = omeprazole pantoprazole rabeprazole domperidone ondansetron ranitidine sucral sucralfate antacid
+Diabetes = metformin glimepiride sitagliptin insulin any antidiabetic
+Vitamin & Supplement = vitamin D3 B12 calcium iron zinc folic acid multivitamin
+Syrup = any liquid suspension syrup form
+Injection = any injectable vial ampoule IV
+Cream & Ointment = any topical gel cream lotion ointment
+Baby Care = baby powder soap oil food lotion diaper
+Surgical & Dressing = bandage cotton gauze gloves syringe
+Hygiene & Sanitizer = sanitizer dettol savlon soap handwash
+Health Drink & Nutrition = ORS walyte electral pedialyte oral rehydration electrolyte eno glucose protein drink
+Ayurvedic = herbal ayurvedic patanjali dabur himalaya
+Eye & Ear Drops = eye drops ear drops ophthalmic otic
+Cardiac & BP = amlodipine atenolol metoprolol ramipril losartan atorvastatin any antihypertensive cardiac
+Skin Care = antifungal fluconazole ketoconazole terbinafine clotrimazole dermatological
+Women Health = feminine hygiene pregnancy supplement dysmenorrhea non-hormonal contraceptive
+Hormones & Steroids = prednisolone dexamethasone betamethasone omnacortil wysolone ovral oval-g thyroid levothyroxine corticosteroid hormonal
+Neurological = trinicalm trihexyphenidyl trifluoperazine haloperidol risperidone olanzapine antipsychotic anticholinergic anticonvulsant
+General OTC = anything that truly does not fit above
 
-Task: Identify the correct pharmacy category based on drug class and therapeutic use.
-
-IMPORTANT RULES:
-- Oval-G contains Norgestrel + Ethinyl Estradiol = Hormones & Steroids (oral contraceptive)
-- Any oral contraceptive pill = Hormones & Steroids
-- Any corticosteroid (prednisolone, dexamethasone, betamethasone) = Hormones & Steroids  
-- Any thyroid hormone (levothyroxine, thyroxine) = Hormones & Steroids
-- Schedule H drugs that are hormones = Hormones & Steroids
-- Paracetamol/Acetaminophen based = Pain Relief
-- Any NSAID (nimesulide, ibuprofen, diclofenac, aceclofenac) = Pain Relief
-- Any antibiotic = Antibiotic
-- Omeprazole/Pantoprazole/antacid = Gastro
-- Cetirizine/antihistamine = Allergy
-- Metformin/insulin/antidiabetic = Diabetes
-- Vitamins/minerals/supplements = Vitamin & Supplement
-- Any liquid medicine = Syrup
-- Any injectable = Injection
-- Any topical gel/cream = Cream & Ointment
-- Baby products = Baby Care
-- Cotton/bandage/surgical = Surgical & Dressing
-- Sanitizer/dettol/soap = Hygiene & Sanitizer
-- ORS/protein drink/eno = Health Drink & Nutrition
-- Ayurvedic/herbal = Ayurvedic
-- Eye/ear drops = Eye & Ear Drops
-- BP/heart/cholesterol medicines = Cardiac & BP
-- Antifungal skin treatments = Skin Care
-- Pregnancy/feminine/contraceptive non-hormonal = Women Health
-
-Return ONLY:
-{
-  "category": "exact category name",
-  "imageUrl": "https://www.google.com/search?q=${encodeURIComponent(name)}+medicine&tbm=isch"
-}` }
+Return ONLY JSON: {"category": "exact name from list above"}` }
         ],
-        max_tokens: 1000,
-        temperature: 0.1
+        max_tokens: 50,
+        temperature: 0.0
       })
     });
     const data = await res.json() as any;
     const text = data.choices?.[0]?.message?.content || "{}";
-    const jsonMatch = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-if (!jsonMatch) throw new Error("No JSON found in AI response");
-const clean = jsonMatch[0].trim();
-const parsed = JSON.parse(clean);
-    const result = {
-      category: parsed.category || "General OTC",
-      imageUrl: parsed.imageUrl || `https://www.google.com/search?q=${encodeURIComponent(name + " medicine")}&tbm=isch`
-    };
-    // Save to cache
-    await saveMedicineCache(name, result.category, result.imageUrl, saltName);
-    return result;
-  } catch {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
     return {
-      category: "General OTC",
-      imageUrl: `https://www.google.com/search?q=${encodeURIComponent(name + " medicine")}&tbm=isch`
+      category: parsed.category || "General OTC",
+      imageUrl: `https://source.unsplash.com/80x80/?medicine,pill,tablet`
     };
+  } catch {
+    return { category: "General OTC", imageUrl: "" };
   }
 }
 
 function normalizeDate(d: string): string {
   if (!d) return "";
-  if (/^\d{2}\/\d{4}$/.test(d)) return d;
-  if (/^\d{2}-\d{4}$/.test(d)) return d.replace("-", "/");
-  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { const p = d.split("-"); return `${p[1]}/${p[0]}`; }
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) { const p = d.split("/"); return `${p[1]}/${p[2]}`; }
-  if (/^\d{2}-\d{2}-\d{4}$/.test(d)) { const p = d.split("-"); return `${p[1]}/${p[2]}`; }
-  if (/^\d{4}\/\d{2}\/\d{2}$/.test(d)) { const p = d.split("/"); return `${p[1]}/${p[0]}`; }
+  if (/^\d{2}\/\d{4}$/.test(d)) { const [m, y] = d.split("/"); return `${y}-${m}-01`; }
+  if (/^\d{2}-\d{4}$/.test(d)) { const [m, y] = d.split("-"); return `${y}-${m}-01`; }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) { const p = d.split("/"); return `${p[2]}-${p[1]}-${p[0]}`; }
+  if (/^\d{2}-\d{2}-\d{4}$/.test(d)) { const p = d.split("-"); return `${p[2]}-${p[1]}-${p[0]}`; }
   return d;
 }
+
+const VALID_CATEGORIES = ["Pain Relief","Antibiotic","Allergy","Gastro","Diabetes","Vitamin & Supplement","Syrup","Injection","Cream & Ointment","Baby Care","Surgical & Dressing","Hygiene & Sanitizer","Health Drink & Nutrition","Ayurvedic","Eye & Ear Drops","Cardiac & BP","Skin Care","Women Health","Hormones & Steroids","Neurological","General OTC"];
 
 router.post("/", async (req, res) => {
   const { image, type } = req.body;
@@ -136,41 +72,32 @@ router.post("/", async (req, res) => {
   if (!apiKey) return res.status(500).json({ error: "API key not configured" });
 
   const prompt = type === "bill"
-    ? `Wholesaler medicine bill. Extract ALL medicines. Return ONLY JSON array:
+    ? `Wholesaler medicine bill image. Extract ALL medicines. Return ONLY JSON array:
 [{
-  "name": "BRAND name only e.g. Essthro Dolo Crocin Oval-G",
-  "saltName": "full composition e.g. Azithromycin IP 250mg or Norgestrel 0.5mg + Ethinyl Estradiol 0.05mg",
+  "name": "BRAND name only",
+  "saltName": "full salt/composition",
   "price": "MRP number",
   "stock": 10,
-  "category": "best guess category",
-  "batchNumber": "exact batch printed e.g. BT241098",
-  "expiryDate": "MM/YYYY e.g. 09/2026 NEVER DD/MM/YYYY",
+  "category": "best category",
+  "batchNumber": "exact batch e.g. BT241098",
+  "expiryDate": "MM/YYYY e.g. 09/2026",
   "manufacturer": "company name",
-  "dosage": "if visible",
+  "dosage": "dosage if visible",
   "requiresPrescription": false
 }]`
     : `Medicine package image.
-BRAND = large trade name e.g. Essthro, Dolo, Oval-G, Augmentin
-SALT = composition e.g. Azithromycin IP 250mg, Norgestrel+Ethinyl Estradiol
-
-CRITICAL DATE RULES:
-- EXP printed as MM/YYYY → return as MM/YYYY e.g. 09/2026
-- MFG printed as MM/YYYY → return as MM/YYYY e.g. 10/2024
-- NEVER return YYYY-MM-DD or DD/MM/YYYY
-- Batch = B.No or Batch number e.g. CPT241098 copy exactly
-
 Return ONLY JSON:
 {
-  "name": "BRAND only",
-  "saltName": "full salt+strength",
-  "category": "best guess",
-  "price": "MRP",
+  "name": "BRAND name only",
+  "saltName": "full salt with strength",
+  "category": "best category",
+  "price": "MRP number",
   "dosage": "dosage",
   "howToTake": "how to take",
   "sideEffects": "side effects",
   "manufacturer": "company",
-  "batchNumber": "exact e.g. CPT241098",
-  "expiryDate": "MM/YYYY only",
+  "batchNumber": "exact batch e.g. CPT241098",
+  "expiryDate": "MM/YYYY only e.g. 09/2026",
   "requiresPrescription": true or false,
   "stock": 10
 }`;
@@ -191,13 +118,13 @@ Return ONLY JSON:
     });
 
     const data = await response.json() as any;
-    if (!response.ok) return res.status(500).json({ error: data.error?.message || "AI error", details: data.error });
+    if (!response.ok) return res.status(500).json({ error: data.error?.message || "AI error" });
 
     const rawText = data.choices?.[0]?.message?.content || "";
     const jsonMatch = rawText.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-    if (!jsonMatch) throw new Error("No JSON found in AI response: " + rawText.slice(0, 100));
+    if (!jsonMatch) throw new Error("No JSON in response: " + rawText.slice(0, 100));
     const parsed = JSON.parse(jsonMatch[0].trim());
-    // Always run second AI lookup for accurate category + image
+
     if (Array.isArray(parsed)) {
       for (const item of parsed) {
         item.expiryDate = normalizeDate(item.expiryDate || "");
@@ -232,16 +159,17 @@ router.post("/text", async (req, res) => {
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: "Pharmacy bill extraction. Return only valid JSON." },
-          { role: "user", content: `Extract medicines from bill. Return ONLY JSON array:
+          { role: "system", content: "Pharmacy data extraction. Return only valid JSON array." },
+          { role: "user", content: `Extract all medicines from this wholesaler bill. Return ONLY JSON array:
 [{"name":"BRAND","saltName":"salt+strength","price":"number","stock":10,"category":"","batchNumber":"","expiryDate":"MM/YYYY","manufacturer":"","dosage":"","requiresPrescription":false}]
 
-Bill:
+Bill text:
 ${text}
 
-Return only JSON array.` }
+Return only the JSON array.` }
         ],
-        max_tokens: 1000, temperature: 0.1
+        max_tokens: 1000,
+        temperature: 0.1
       })
     });
 
@@ -249,7 +177,7 @@ Return only JSON array.` }
     if (!response.ok) return res.status(500).json({ error: data.error?.message });
     const raw = data.choices?.[0]?.message?.content || "[]";
     const jsonMatch2 = raw.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-    if (!jsonMatch2) throw new Error("No JSON in response: " + raw.slice(0, 100));
+    if (!jsonMatch2) throw new Error("No JSON in response");
     const arr = JSON.parse(jsonMatch2[0].trim());
     const result = Array.isArray(arr) ? arr : [arr];
 
@@ -262,7 +190,7 @@ Return only JSON array.` }
 
     res.json({ result });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed: " + err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 

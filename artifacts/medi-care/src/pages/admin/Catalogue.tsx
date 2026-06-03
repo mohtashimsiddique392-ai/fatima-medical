@@ -298,11 +298,11 @@ export default function AdminCatalogue() {
                 return (
                   <tr key={p.id} className={`hover:bg-gray-50 ${exp?.cls.includes("red") ? "bg-red-50/30" : ""}`}>
                     <td className="px-4 py-3">
-                      {p.imageUrl ? (
+                      {p.imageUrl && !p.imageUrl.includes("google.com") && !p.imageUrl.includes("unsplash.com") ? (
                         <img src={p.imageUrl} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-gray-100"
                           onError={e => (e.currentTarget.style.display = "none")} />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-300 text-xs">No img</div>
+                        <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-2xl">💊</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
