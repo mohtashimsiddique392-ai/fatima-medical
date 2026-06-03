@@ -11,6 +11,8 @@ import healthRecordsRouter from "./healthrecords";
 import otpRouter from "./otp";
 import scanRouter from "./scan";
 import billingRouter from "./billing";
+import settingsRouter from "./settings";
+import migrateRouter from "./migrate";
 
 const router: IRouter = Router();
 
@@ -26,5 +28,7 @@ router.use("/health-records", healthRecordsRouter);
 router.use("/otp", otpRouter);
 router.use("/scan", scanRouter);
 router.use("/billing", billingRouter);
+router.use("/settings", settingsRouter);
+router.use("/migrate", migrateRouter);
 
 export default router;

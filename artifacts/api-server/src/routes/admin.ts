@@ -1,48 +1,68 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { ordersTable, orderItemsTable, productsTable, customersTable } from "@workspace/db";
-import { eq, isNotNull, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { Pool } from "pg";
 
 const router = Router();
+const getPool = () => new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 router.get("/dashboard", async (_req, res) => {
-  const orders = await db.select().from(ordersTable);
-  const products = await db.select().from(productsTable).where(eq(productsTable.isActive, true));
-  const customers = await db.select().from(customersTable);
+  const pool = getPool();
+  try {
+    const orders = await db.select().from(ordersTable);
+    const products = await db.select().from(productsTable).where(eq(productsTable.isActive, true));
+    const customers = await db.select().from(customersTable);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayStr = new Date().toISOString().split("T")[0];
+    const soon = new Date(); soon.setDate(soon.getDate() + 30);
+    const soonStr = soon.toISOString().split("T")[0];
 
-  const totalRevenue = orders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + Number(o.totalAmount), 0);
-  const todayRevenue = orders.filter(o => new Date(o.createdAt) >= today && o.status !== "cancelled").reduce((sum, o) => sum + Number(o.totalAmount), 0);
-  const pendingOrders = orders.filter(o => o.status === "pending").length;
-  const lowStockProducts = products.filter(p => p.stock < 10).length;
+    const activeOrders = orders.filter(o => o.status !== "cancelled");
+    const totalRevenue = activeOrders.reduce((s, o) => s + Number(o.totalAmount), 0);
+    const todayRevenue = activeOrders.filter(o => new Date(o.createdAt) >= today).reduce((s, o) => s + Number(o.totalAmount), 0);
+    const pendingOrders = orders.filter(o => o.status === "pending").length;
+    const lowStockProducts = products.filter(p => p.stock < 10).length;
+    const expiringProducts = products.filter(p => p.expiryDate && p.expiryDate <= soonStr);
 
-  // Expiry alerts within 30 days
-  const todayStr = new Date().toISOString().split("T")[0];
-  const soon = new Date(); soon.setDate(soon.getDate() + 30);
-  const soonStr = soon.toISOString().split("T")[0];
-  const expiringProducts = products.filter(p => p.expiryDate && p.expiryDate <= soonStr);
+    const { rows: billItems } = await pool.query(
+      "SELECT bi.product_id, bi.quantity, bi.amount FROM bill_items bi JOIN bills b ON b.id = bi.bill_id"
+    );
 
-  const recentOrders = await Promise.all(
-    orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5).map(async (order) => {
-      const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-      const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1);
-      return { ...order, items, customerName: customer?.name, customerPhone: customer?.phone };
-    })
-  );
+    let totalCost = 0;
+    let totalSalesRevenue = 0;
+    for (const item of billItems) {
+      const product = products.find(p => p.id === item.product_id);
+      const costPrice = product?.costPrice ? Number(product.costPrice) : 0;
+      totalCost += costPrice * item.quantity;
+      totalSalesRevenue += Number(item.amount);
+    }
+    const grossProfit = totalSalesRevenue - totalCost;
+    const profitMargin = totalSalesRevenue > 0 ? ((grossProfit / totalSalesRevenue) * 100).toFixed(1) : "0";
+    const expiredProducts = products.filter(p => p.expiryDate && p.expiryDate < todayStr);
+    const expiryLoss = expiredProducts.reduce((s, p) => s + (Number(p.costPrice || 0) * p.stock), 0);
 
-  res.json({
-    totalOrders: orders.length,
-    pendingOrders,
-    totalRevenue,
-    todayRevenue,
-    totalCustomers: customers.length,
-    totalProducts: products.length,
-    lowStockProducts,
-    expiringCount: expiringProducts.length,
-    recentOrders,
-  });
+    const recentOrders = await Promise.all(
+      orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5).map(async (order) => {
+          const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+          const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1);
+          return { ...order, items, customerName: customer?.name, customerPhone: customer?.phone };
+        })
+    );
+
+    res.json({
+      totalOrders: orders.length, pendingOrders, totalRevenue, todayRevenue,
+      totalCustomers: customers.length, totalProducts: products.length,
+      lowStockProducts, expiringCount: expiringProducts.length, recentOrders,
+      profit: {
+        totalSalesRevenue, totalCost, grossProfit,
+        profitMargin: Number(profitMargin), expiryLoss,
+        netProfit: grossProfit - expiryLoss,
+      }
+    });
+  } finally { pool.end(); }
 });
 
 router.get("/customers", async (_req, res) => {

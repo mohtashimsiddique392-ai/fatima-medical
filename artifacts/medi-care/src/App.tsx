@@ -2,14 +2,17 @@ import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wo
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import Navbar from "@/components/Navbar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import Navbar from "@/components/Navbar";
+import MaintenanceScreen from "@/components/MaintenanceScreen";
+import { useEffect, useState } from "react";
 
 import Landing from "@/pages/Landing";
 import CustomerLogin from "@/pages/CustomerLogin";
 import CustomerRegister from "@/pages/CustomerRegister";
 import AdminLogin from "@/pages/AdminLogin";
 import Store from "@/pages/Store";
+import ProductDetail from "@/pages/ProductDetail";
 import Cart from "@/pages/Cart";
 import Orders from "@/pages/Orders";
 import Referrals from "@/pages/Referrals";
@@ -53,7 +56,6 @@ const NO_NAVBAR = ["/", "/login", "/register", "/admin-login"];
 function AppRouter() {
   const [location] = useLocation();
   const showNavbar = !NO_NAVBAR.includes(location);
-
   return (
     <>
       {showNavbar && <Navbar />}
@@ -66,6 +68,7 @@ function AppRouter() {
         <Route path="/register" component={CustomerRegister} />
         <Route path="/admin-login" component={AdminLogin} />
         <Route path="/store"><ProtectedCustomer><Store /></ProtectedCustomer></Route>
+        <Route path="/store/product/:id"><ProtectedCustomer><ProductDetail /></ProtectedCustomer></Route>
         <Route path="/cart"><Cart /></Route>
         <Route path="/orders"><ProtectedCustomer><Orders /></ProtectedCustomer></Route>
         <Route path="/referrals"><ProtectedCustomer><Referrals /></ProtectedCustomer></Route>
@@ -87,14 +90,41 @@ function AppRouter() {
   );
 }
 
+function AppWithMaintenance() {
+  const { user } = useAuth();
+  const [maintenance, setMaintenance] = useState<{ mode: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
+    fetch(`${BASE}/settings/public`)
+      .then(r => r.json())
+      .then(d => setMaintenance({ mode: d.maintenanceMode, message: d.maintenanceMessage }))
+      .catch(() => setMaintenance({ mode: false, message: "" }));
+  }, []);
+
+  if (maintenance === null) return (
+    <div className="min-h-screen flex items-center justify-center bg-blue-600">
+      <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (maintenance.mode && user?.role !== "admin") {
+    return <MaintenanceScreen message={maintenance.message} />;
+  }
+
+  return (
+    <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+      <AppRouter />
+    </WouterRouter>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <AppRouter />
-          </WouterRouter>
+          <AppWithMaintenance />
           <Toaster />
         </AuthProvider>
       </QueryClientProvider>
