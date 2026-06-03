@@ -42,7 +42,7 @@ export default function AdminDashboard() {
           {[
             { icon: ShoppingBag, label: "Total Orders", value: stats.totalOrders, color: "text-blue-600", bg: "bg-blue-50", href: "/admin/orders" },
             { icon: Clock, label: "Pending", value: stats.pendingOrders, color: "text-yellow-600", bg: "bg-yellow-50", href: "/admin/orders" },
-            { icon: TrendingUp, label: "Revenue", value: `₹${Number(stats.totalRevenue).toFixed(0)}`, color: "text-green-600", bg: "bg-green-50", href: "/admin/billing" },
+            { icon: TrendingUp, label: "Revenue", value: `₹${Number(stats.totalRevenue).toFixed(0)}`, color: "text-green-600", bg: "bg-green-50", href: "/admin/orders" },
             { icon: Users, label: "Customers", value: stats.totalCustomers, color: "text-purple-600", bg: "bg-purple-50", href: "/admin/customers" },
           ].map(({ icon: Icon, label, value, color, bg, href }) => (
             <button key={label} onClick={() => navigate(href)}
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <button onClick={() => navigate("/admin/billing")}
+          <button onClick={() => navigate("/admin/orders")}
             className="bg-white rounded-xl border border-gray-100 p-4 text-left hover:shadow-md hover:border-blue-200 transition-all active:scale-95">
             <p className="text-sm text-gray-500">Today's Revenue</p>
             <p className="text-2xl font-bold text-teal-600 mt-1">₹{Number(stats.todayRevenue).toFixed(0)}</p>
