@@ -108,10 +108,12 @@ function AppWithMaintenance() {
     </div>
   );
 
-  if (maintenance.mode && user?.role !== "admin") {
+  const currentPath = window.location.pathname;
+  const isAdminRoute = currentPath.startsWith("/admin");
+
+  if (maintenance.mode && user?.role !== "admin" && !isAdminRoute) {
     return <MaintenanceScreen message={maintenance.message} />;
   }
-
   return (
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <AppRouter />
