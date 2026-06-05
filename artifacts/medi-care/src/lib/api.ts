@@ -51,7 +51,7 @@ export const api = {
   updateSubAdmin: (id: number, body: any) => request<any>(`/billing/sub-admins/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteSubAdmin: (id: number) => request<any>(`/billing/sub-admins/${id}`, { method: "DELETE" }),
 
-  getMyReferral: () => request<any>("/referrals/my"),
+  getMyReferral: (customerId: number) => request<any>(`/referrals/my?customerId=${customerId}`),
   applyReferral: (body: any) => request<any>("/referrals/apply", { method: "POST", body: JSON.stringify(body) }),
 
   chat: (body: any) => request<any>("/chat", { method: "POST", body: JSON.stringify(body) }),
