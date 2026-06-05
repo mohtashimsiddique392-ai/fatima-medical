@@ -44,7 +44,7 @@ export default function ProductDetail() {
 
   const handleAdd = () => {
     if (!product) return;
-    addToCart({ id: product.id, name: product.name, price: Number(product.price), imageUrl: product.imageUrl });
+    addToCart({ id: product.id, name: product.name, price: Number(product.price), imageUrl: product.imageUrl, stock: product.stock });
     setAdded(true); setTimeout(() => setAdded(false), 2000);
   };
 

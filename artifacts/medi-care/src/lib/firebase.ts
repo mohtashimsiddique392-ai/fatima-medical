@@ -1,10 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
-import {
-  getAuth,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  type ConfirmationResult,
-} from "firebase/auth";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,13 +10,10 @@ const firebaseConfig = {
 };
 
 const firebaseReady = !!firebaseConfig.apiKey && !!firebaseConfig.appId;
-
-const app = firebaseReady
-  ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig))
-  : null;
-
+const app = firebaseReady ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig)) : null;
 export const auth = app ? getAuth(app) : null;
 if (auth) auth.languageCode = "en";
+
 let recaptchaVerifier: RecaptchaVerifier | null = null;
 
 export function getOrCreateRecaptcha(containerId: string): RecaptchaVerifier {
@@ -38,13 +30,20 @@ export function getOrCreateRecaptcha(containerId: string): RecaptchaVerifier {
 }
 
 export function resetRecaptcha() {
-  try { recaptchaVerifier?.clear(); } catch {}
+  try { if (recaptchaVerifier) recaptchaVerifier.clear(); } catch {}
   recaptchaVerifier = null;
-  const container = document.getElementById("recaptcha-container");
-  if (container) container.innerHTML = "";
+  try {
+    const container = document.getElementById("recaptcha-container");
+    if (container && container.parentNode) {
+      while (container.firstChild) {
+        container.removeChild(container.firstChild);
+      }
+    }
+  } catch {}
 }
 
 export async function sendOtpToPhone(phoneE164: string, containerId = "recaptcha-container"): Promise<ConfirmationResult> {
+  if (!auth) throw new Error("Firebase not configured.");
   const verifier = getOrCreateRecaptcha(containerId);
   return await signInWithPhoneNumber(auth, phoneE164, verifier);
 }

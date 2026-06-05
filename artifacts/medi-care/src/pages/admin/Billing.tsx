@@ -319,8 +319,19 @@ const printBill = () => {
   </div>
 
   <div class="no-print" style="text-align:center;margin-top:20px;">
-    <button onclick="window.print()" style="background:#0d9488;color:white;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer;margin-right:10px;">Print / Save PDF</button>
-    <button onclick="window.close()" style="background:#e5e7eb;color:#374151;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer;">Close</button>
+    <button onclick="window.print()" style="background:#0d9488;color:white;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer;margin-right:10px;">🖨️ Print</button>
+<button onclick="downloadPDF()" style="background:#1E40AF;color:white;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer;margin-right:10px;">⬇️ Download PDF</button>
+<button onclick="window.close()" style="background:#e5e7eb;color:#374151;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer;">✕ Close</button>
+</div>
+<script>
+function downloadPDF() {
+  const s = document.createElement('style');
+  s.textContent = '.no-print{display:none!important}';
+  document.head.appendChild(s);
+  window.print();
+  setTimeout(() => document.head.removeChild(s), 1000);
+}
+</script>
   </div>
 </div>
 </body>

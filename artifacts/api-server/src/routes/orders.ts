@@ -50,39 +50,36 @@ router.post("/", async (req, res) => {
   }
 
   let creditsUsed = 0;
-  if (useReferralCredits && Number(customer.referralCredits) > 0) {
+  if (customer && useReferralCredits && Number(customer.referralCredits) > 0) {
     creditsUsed = Math.min(Number(customer.referralCredits), total * 0.1);
     total -= creditsUsed;
   }
 
   const [order] = await db.insert(ordersTable).values({
-    customerId, totalAmount: String(total), paymentMethod,
+    customerId: customerId || null, totalAmount: String(total), paymentMethod,
     paymentStatus: "pending", status: "pending",
     address, notes, creditsUsed: String(creditsUsed)
   }).returning();
 
   for (const item of enrichedItems) {
     await db.insert(orderItemsTable).values({ orderId: order.id, ...item, price: String(item.price) });
-    // Deduct stock when order placed
     await db.update(productsTable)
       .set({ stock: sql`${productsTable.stock} - ${item.quantity}` })
       .where(eq(productsTable.id, item.productId));
   }
 
-  if (creditsUsed > 0) {
+  if (customer && creditsUsed > 0) {
     await db.update(customersTable)
       .set({ referralCredits: String(Number(customer.referralCredits) - creditsUsed) })
       .where(eq(customersTable.id, customerId));
   }
 
   const items2 = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-  return res.status(201).json({ ...order, items: items2, customerName: customer.name, customerPhone: customer.phone });
+  return res.status(201).json({ ...order, items: items2, customerName: customer?.name, customerPhone: customer?.phone });
 });
 
 router.put("/:id/status", async (req, res) => {
   const { status, paymentStatus } = req.body;
-
-  // Get order before updating to check previous status
   const [existingOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
   if (!existingOrder) return res.status(404).json({ error: "Order not found" });
 
@@ -91,7 +88,6 @@ router.put("/:id/status", async (req, res) => {
     ...(paymentStatus && { paymentStatus })
   }).where(eq(ordersTable.id, Number(req.params.id))).returning();
 
-  // Restore stock if order is cancelled and wasn't already cancelled
   if (status === "cancelled" && existingOrder.status !== "cancelled") {
     const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
     for (const item of items) {
@@ -99,10 +95,8 @@ router.put("/:id/status", async (req, res) => {
         .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
         .where(eq(productsTable.id, item.productId));
     }
-    console.log(`Stock restored for cancelled order #${order.id}`);
   }
 
-  // Grant referral credit when delivered
   if (status === "delivered" && existingOrder.status !== "delivered") {
     const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1);
     if (customer?.referredBy) {

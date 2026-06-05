@@ -14,7 +14,24 @@ router.get("/", async (req, res) => {
     p.name.toLowerCase().includes((search as string).toLowerCase()) ||
     ((p as any).saltName && (p as any).saltName.toLowerCase().includes((search as string).toLowerCase()))
   );
-  res.json({ products: result, total: result.length });
+
+  const merged = new Map<string, any>();
+  for (const p of result) {
+    const key = `${p.name.toLowerCase().trim()}|${((p as any).saltName || "").toLowerCase().trim()}`;
+    if (merged.has(key)) {
+      const existing = merged.get(key);
+      existing.stock = (existing.stock || 0) + (p.stock || 0);
+      if (!existing.manufacturer && (p as any).manufacturer) existing.manufacturer = (p as any).manufacturer;
+      if (!existing.expiryDate && p.expiryDate) existing.expiryDate = p.expiryDate;
+      if (!existing.batchNumber && (p as any).batchNumber) existing.batchNumber = (p as any).batchNumber;
+      existing._allIds = [...(existing._allIds || [existing.id]), p.id];
+    } else {
+      merged.set(key, { ...p, _allIds: [p.id] });
+    }
+  }
+
+  const deduped = Array.from(merged.values());
+  res.json({ products: deduped, total: deduped.length });
 });
 
 router.get("/categories", async (_req, res) => {
@@ -51,14 +68,9 @@ router.post("/", async (req, res) => {
   const [product] = await db.insert(productsTable).values({
     name,
     ...((productsTable as any).saltName !== undefined ? { saltName: saltName || null } : {}),
-    description,
-    price: String(price),
-    category,
-    imageUrl: imageUrl || null,
-    stock: stock || 0,
-    dosage,
-    howToTake,
-    sideEffects,
+    description, price: String(price), category,
+    imageUrl: imageUrl || null, stock: stock || 0,
+    dosage, howToTake, sideEffects,
     requiresPrescription: requiresPrescription || false,
     isActive: true,
     expiryDate: expiryDate || null,

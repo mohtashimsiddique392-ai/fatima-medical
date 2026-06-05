@@ -135,8 +135,10 @@ export default function AdminCatalogue() {
       setForm(p => ({
         ...p, ...parsed,
         price: String(parsed.price || ""),
+        costPrice: String(parsed.costPrice || ""),
         stock: Number(parsed.stock) || 10,
         saltName: parsed.saltName || "",
+        manufacturer: parsed.manufacturer || p.manufacturer || "",
         imageUrl: parsed.suggestedImageUrl || p.imageUrl || ""
       }));
       setScanMsg("✓ AI scan complete! Review details and image below then save.");

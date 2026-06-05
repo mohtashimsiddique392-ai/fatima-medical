@@ -41,7 +41,7 @@ export default function Store() {
 
   const handleAdd = (e: React.MouseEvent, p: Product) => {
     e.stopPropagation();
-    addToCart({ id: p.id, name: p.name, price: Number(p.price), imageUrl: p.imageUrl });
+    addToCart({ id: p.id, name: p.name, price: Number(p.price), imageUrl: p.imageUrl, stock: p.stock });
     setAdded(p.id); setTimeout(() => setAdded(null), 1500);
   };
 
