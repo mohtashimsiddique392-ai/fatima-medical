@@ -56,13 +56,14 @@ export const api = {
 
   chat: (body: any) => request<any>("/chat", { method: "POST", body: JSON.stringify(body) }),
 
-  getFamily: () => request<any>("/family"),
+  getFamily: (customerId: number) => request<any>(`/family?customerId=${customerId}`),
   addFamilyMember: (body: any) => request<any>("/family", { method: "POST", body: JSON.stringify(body) }),
   updateFamilyMember: (id: number, body: any) => request<any>(`/family/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteFamilyMember: (id: number) => request<any>(`/family/${id}`, { method: "DELETE" }),
 
-  getHealthRecords: () => request<any>("/health-records"),
-  addHealthRecord: (body: any) => request<any>("/health-records", { method: "POST", body: JSON.stringify(body) }),
+  getHealthRecords: (customerId: number, familyMemberId?: number) => request<any>(`/health-records?customerId=${customerId}${familyMemberId ? "&familyMemberId=" + familyMemberId : ""}`),
+addHealthRecord: (body: any) => request<any>("/health-records", { method: "POST", body: JSON.stringify(body) }),
+
   deleteHealthRecord: (id: number) => request<any>(`/health-records/${id}`, { method: "DELETE" }),
 
   scanImage: (body: any) => request<any>("/scan", { method: "POST", body: JSON.stringify(body) }),
