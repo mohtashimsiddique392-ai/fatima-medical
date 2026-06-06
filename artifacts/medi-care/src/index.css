@@ -1,3 +1,8 @@
+/* Disable pull-to-refresh and overscroll */
+html, body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+}
 @import "tailwindcss";
 @import "tw-animate-css";
 
