@@ -1,9 +1,11 @@
 import { Router } from "express";
+import { Pool } from "pg";
 import { db } from "@workspace/db";
 import { ordersTable, orderItemsTable, productsTable, customersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 const router = Router();
+const getPool = () => new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 router.get("/", async (req, res) => {
   const { customerId, status } = req.query as { customerId?: string; status?: string };
@@ -13,7 +15,9 @@ router.get("/", async (req, res) => {
 
   const result = await Promise.all(orders.map(async order => {
     const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-    const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1);
+    const [customer] = order.customerId
+      ? await db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1)
+      : [null];
     return { ...order, items, customerName: customer?.name, customerPhone: customer?.phone };
   }));
 
@@ -25,7 +29,9 @@ router.get("/:id", async (req, res) => {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
   if (!order) return res.status(404).json({ error: "Order not found" });
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-  const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1);
+  const [customer] = order.customerId
+    ? await db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1)
+    : [null];
   return res.json({ ...order, items, customerName: customer?.name, customerPhone: customer?.phone });
 });
 
@@ -82,40 +88,50 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id/status", async (req, res) => {
-  const { status, paymentStatus } = req.body;
-  const [existingOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
-  if (!existingOrder) return res.status(404).json({ error: "Order not found" });
+  const pool = getPool();
+  try {
+    const { status, paymentStatus } = req.body;
+    const id = Number(req.params.id);
 
-  const updateData: any = {};
-  if (status) updateData.status = status;
-  if (paymentStatus) updateData.paymentStatus = paymentStatus;
+    const [existingOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
+    if (!existingOrder) return res.status(404).json({ error: "Order not found" });
 
-  const [order] = await db.update(ordersTable)
-    .set(updateData)
-    .where(eq(ordersTable.id, Number(req.params.id)))
-    .returning();
+    const { rows } = await pool.query(
+      `UPDATE orders SET
+        status = COALESCE($1, status),
+        payment_status = COALESCE($2, payment_status)
+      WHERE id = $3
+      RETURNING *`,
+      [status || null, paymentStatus || null, id]
+    );
+    const order = rows[0];
 
-  if (status === "cancelled" && existingOrder.status !== "cancelled") {
-    const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-    for (const item of items) {
-      await db.update(productsTable)
-        .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
-        .where(eq(productsTable.id, item.productId));
+    if (status === "cancelled" && existingOrder.status !== "cancelled") {
+      const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
+      for (const item of items) {
+        await db.update(productsTable)
+          .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
+          .where(eq(productsTable.id, item.productId));
+      }
     }
-  }
 
-  if (status === "delivered" && existingOrder.status !== "delivered") {
-    const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1);
-    if (customer?.referredBy) {
-      const bonus = Number(order.totalAmount) * 0.05;
-      await db.update(customersTable)
-        .set({ referralCredits: String(Number(customer.referralCredits) + bonus) })
-        .where(eq(customersTable.id, customer.referredBy));
+    if (status === "delivered" && existingOrder.status !== "delivered") {
+      if (existingOrder.customerId) {
+        const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, existingOrder.customerId)).limit(1);
+        if (customer?.referredBy) {
+          const bonus = Number(order.total_amount) * 0.05;
+          await db.update(customersTable)
+            .set({ referralCredits: String(Number(customer.referralCredits) + bonus) })
+            .where(eq(customersTable.id, customer.referredBy));
+        }
+      }
     }
-  }
 
-  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-  return res.json({ ...order, items });
+    const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
+    return res.json({ ...order, items });
+  } finally {
+    pool.end();
+  }
 });
 
 export default router;
