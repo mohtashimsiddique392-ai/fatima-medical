@@ -86,10 +86,14 @@ router.put("/:id/status", async (req, res) => {
   const [existingOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, Number(req.params.id))).limit(1);
   if (!existingOrder) return res.status(404).json({ error: "Order not found" });
 
-  const [order] = await db.update(ordersTable).set({
-    ...(status && { status }),
-    ...(paymentStatus && { paymentStatus })
-  }).where(eq(ordersTable.id, Number(req.params.id))).returning();
+  const updateData: any = {};
+  if (status) updateData.status = status;
+  if (paymentStatus) updateData.paymentStatus = paymentStatus;
+
+  const [order] = await db.update(ordersTable)
+    .set(updateData)
+    .where(eq(ordersTable.id, Number(req.params.id)))
+    .returning();
 
   if (status === "cancelled" && existingOrder.status !== "cancelled") {
     const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
