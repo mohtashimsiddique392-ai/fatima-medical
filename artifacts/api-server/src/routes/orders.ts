@@ -31,12 +31,15 @@ router.get("/:id", async (req, res) => {
 
 router.post("/", async (req, res) => {
   const { customerId, items, paymentMethod, address, notes, useReferralCredits } = req.body;
-  if (!customerId || !items?.length || !paymentMethod || !address) {
+  if (!items?.length || !paymentMethod || !address) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, customerId)).limit(1);
-  if (!customer) return res.status(404).json({ error: "Customer not found" });
+  let customer: any = null;
+  if (customerId) {
+    const [found] = await db.select().from(customersTable).where(eq(customersTable.id, customerId)).limit(1);
+    customer = found || null;
+  }
 
   let total = 0;
   const enrichedItems: { productId: number; productName: string; quantity: number; price: number }[] = [];
