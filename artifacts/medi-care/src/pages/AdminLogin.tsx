@@ -23,8 +23,21 @@ export default function AdminLogin() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const res = await api.adminLogin(form);
-      login({ ...res, role: "admin" });
+      let res;
+      try {
+        res = await api.adminLogin(form);
+        login({ ...res, role: "admin" });
+      } catch {
+        const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
+        const r = await fetch(`${BASE}/billing/sub-admins/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form)
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Invalid credentials");
+        login({ ...data, role: "admin" });
+      }
       navigate("/admin");
     } catch (err: any) {
       setError(err.message);

@@ -34,9 +34,15 @@ export const api = {
   updateProduct: (id: number, body: any) => request<any>(`/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteProduct: (id: number) => request<any>(`/products/${id}`, { method: "DELETE" }),
 
-  getOrders: () => request<any>("/orders"),
+  getOrders: (params?: { customerId?: number; status?: string }) => {
+  const q = new URLSearchParams();
+  if (params?.customerId) q.set("customerId", String(params.customerId));
+  if (params?.status) q.set("status", params.status);
+  return request<any>(`/orders${q.toString() ? "?" + q : ""}`);
+},
+
   createOrder: (body: any) => request<any>("/orders", { method: "POST", body: JSON.stringify(body) }),
-  updateOrderStatus: (id: number, status: string) => request<any>(`/orders/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
+  updateOrderStatus: (id: number, body: { status?: string; paymentStatus?: string }) => request<any>(`/orders/${id}/status`, { method: "PUT", body: JSON.stringify(body) }),
 
   getDashboard: () => request<any>("/admin/dashboard"),
   getCustomers: () => request<any>("/admin/customers"),
