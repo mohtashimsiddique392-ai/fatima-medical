@@ -68,22 +68,32 @@ router.put("/sub-admins/:id", async (req, res) => {
   const pool = getPool();
   try {
     const { name, phone, permissions, is_active, password } = req.body;
-    let passwordUpdate = "";
-    const params: any[] = [name, phone, JSON.stringify(permissions), is_active, req.params.id];
-    if (password) {
+    const id = Number(req.params.id);
+    const isActive = is_active !== undefined ? is_active : true;
+    const permsJson = JSON.stringify(permissions || {});
+
+    let rows;
+    if (password && password.trim()) {
       const hashed = await bcrypt.hash(password, 10);
-      passwordUpdate = ", password = $6";
-      params.splice(4, 0, hashed);
-      params[params.length - 1] = req.params.id;
+      const result = await pool.query(
+        `UPDATE sub_admins SET name=$1, phone=$2, permissions=$3, is_active=$4, password=$5 WHERE id=$6 RETURNING id, username, name, phone, permissions, is_active`,
+        [name, phone || null, permsJson, isActive, hashed, id]
+      );
+      rows = result.rows;
+    } else {
+      const result = await pool.query(
+        `UPDATE sub_admins SET name=$1, phone=$2, permissions=$3, is_active=$4 WHERE id=$5 RETURNING id, username, name, phone, permissions, is_active`,
+        [name, phone || null, permsJson, isActive, id]
+      );
+      rows = result.rows;
     }
-    const { rows } = await pool.query(
-      `UPDATE sub_admins SET name=$1, phone=$2, permissions=$3, is_active=$4${passwordUpdate} WHERE id=$${params.length} RETURNING id, username, name, phone, permissions, is_active`,
-      params
-    );
+
+    if (!rows[0]) return res.status(404).json({ error: "Sub-admin not found" });
     res.json(rows[0]);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   } finally { pool.end(); }
 });
-
 router.delete("/sub-admins/:id", async (req, res) => {
   const pool = getPool();
   try {

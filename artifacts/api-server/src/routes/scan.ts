@@ -1,7 +1,7 @@
 import { Router } from "express";
 const router = Router();
 
-async function lookupMedicineDetails(name: string, saltName: string, apiKey: string): Promise<{ category: string; manufacturer: string }> {
+async function lookupMedicineDetails(name: string, saltName: string, apiKey: string): Promise<{ category: string; imageUrl: string }> {
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -11,38 +11,32 @@ async function lookupMedicineDetails(name: string, saltName: string, apiKey: str
         messages: [
           { role: "system", content: "You are a pharmacy expert. Return ONLY valid JSON, no other text." },
           { role: "user", content: `Medicine: "${name}", Salt: "${saltName}"
-
-Pick category from ONLY this list:
-Pain Relief = paracetamol ibuprofen nimesulide diclofenac aceclofenac mefenamic acid NSAID analgesic
-Antibiotic = amoxicillin azithromycin ciprofloxacin metronidazole doxycycline cefixime antibacterial
-Allergy = cetirizine levocetirizine fexofenadine loratadine montelukast antihistamine
-Gastro = omeprazole pantoprazole domperidone ondansetron sucral sucralfate antacid ranitidine
-Diabetes = metformin glimepiride sitagliptin insulin antidiabetic
+Choose category from ONLY these (pick the best match by drug class):
+Pain Relief = paracetamol ibuprofen nimesulide diclofenac aceclofenac aspirin tramadol mefenamic acid any NSAID analgesic
+Antibiotic = amoxicillin azithromycin ciprofloxacin metronidazole doxycycline cefixime any antibacterial
+Allergy = cetirizine levocetirizine fexofenadine loratadine montelukast any antihistamine
+Gastro = omeprazole pantoprazole rabeprazole domperidone ondansetron ranitidine sucral sucralfate antacid
+Diabetes = metformin glimepiride sitagliptin insulin any antidiabetic
 Vitamin & Supplement = vitamin D3 B12 calcium iron zinc folic acid multivitamin
-Syrup = chericof cheston benadryl cough syrup suspension liquid 60ML 100ML 200ML any liquid
-Injection = injectable vial ampoule IV
-Cream & Ointment = topical gel cream lotion ointment
-Baby Care = baby powder soap oil food lotion
+Syrup = any liquid suspension syrup form
+Injection = any injectable vial ampoule IV
+Cream & Ointment = any topical gel cream lotion ointment
+Baby Care = baby powder soap oil food lotion diaper
 Surgical & Dressing = bandage cotton gauze gloves syringe
 Hygiene & Sanitizer = sanitizer dettol savlon soap handwash
-Health Drink & Nutrition = ORS walyte electral oral rehydration electrolyte eno glucose protein
+Health Drink & Nutrition = ORS walyte electral pedialyte oral rehydration electrolyte eno glucose protein drink
 Ayurvedic = herbal ayurvedic patanjali dabur himalaya
 Eye & Ear Drops = eye drops ear drops ophthalmic otic
-Cardiac & BP = amlodipine atenolol metoprolol ramipril losartan atorvastatin antihypertensive
+Cardiac & BP = amlodipine atenolol metoprolol ramipril losartan atorvastatin any antihypertensive cardiac
 Skin Care = antifungal fluconazole ketoconazole terbinafine clotrimazole dermatological
-Women Health = feminine hygiene pregnancy supplement dysmenorrhea contraceptive non-hormonal
-Hormones & Steroids = prednisolone dexamethasone betamethasone omnacortil wysolone ovral oval-g thyroid levothyroxine corticosteroid
-Neurological = trinicalm trihexyphenidyl trifluoperazine haloperidol risperidone antipsychotic anticholinergic
-General OTC = anything else
+Women Health = feminine hygiene pregnancy supplement dysmenorrhea non-hormonal contraceptive
+Hormones & Steroids = prednisolone dexamethasone betamethasone omnacortil wysolone ovral oval-g thyroid levothyroxine corticosteroid hormonal
+Neurological = trinicalm trihexyphenidyl trifluoperazine haloperidol risperidone olanzapine antipsychotic anticholinergic anticonvulsant
+General OTC = anything that truly does not fit above
 
-RULES:
-- Any medicine with SYP/Syrup/SY/ML or liquid = Syrup
-- Any cough medicine = Syrup
-
-Return ONLY JSON:
-{"category": "exact name from list", "manufacturer": "likely Indian pharma company or empty string"}` }
+Return ONLY JSON: {"category": "exact name from list above"}` }
         ],
-        max_tokens: 80,
+        max_tokens: 50,
         temperature: 0.0
       })
     });
@@ -50,9 +44,12 @@ Return ONLY JSON:
     const text = data.choices?.[0]?.message?.content || "{}";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-    return { category: parsed.category || "General OTC", manufacturer: parsed.manufacturer || "" };
+    return {
+      category: parsed.category || "General OTC",
+      imageUrl: ""
+    };
   } catch {
-    return { category: "General OTC", manufacturer: "" };
+    return { category: "General OTC", imageUrl: "" };
   }
 }
 
@@ -73,32 +70,33 @@ router.post("/", async (req, res) => {
   if (!apiKey) return res.status(500).json({ error: "API key not configured" });
 
   const prompt = type === "bill"
-    ? `Wholesaler medicine bill image. Extract ALL medicines. Return ONLY JSON array:
+    ? `This is a wholesaler medicine bill. Extract every medicine row from the table. Return ONLY a JSON array:
 [{
-  "name": "BRAND name only (e.g. Chericof Junior, Wysolone, Omnacortil)",
-  "saltName": "full salt/composition if visible",
-  "price": "MRP number",
-  "costPrice": "trade/purchase price if visible",
-  "stock": 10,
+  "name": "Brand name only (from Item Description column, e.g. Chericof Junior, Wysolone, Omnacortil, Trinicalm Forte, Ovral G, Walyte ORS)",
+  "saltName": "salt/composition if visible",
+  "price": "M.R.P column value (the printed maximum retail price)",
+  "costPrice": "Calculate as: Net Value divided by Qty Billed = cost per unit you paid",
+  "stock": "Qty Billed number (how many units you received)",
   "category": "best guess",
-  "batchNumber": "exact batch (e.g. SKY0002SA, NT4015, B150)",
-  "expiryDate": "MM/YYYY only (e.g. 12/2027)",
-  "manufacturer": "company name if visible",
-  "dosage": "pack size (e.g. 60ML, 1*15)",
+  "batchNumber": "Batch column value exactly as printed",
+  "expiryDate": "Exp Date column value in MM/YYYY format",
+  "manufacturer": "Mfac/Mkt By column value (manufacturer/marketed by)",
+  "dosage": "Pack column value (e.g. 60ML, 1*15, 1*20, 5 SACH)",
   "requiresPrescription": false
 }]`
-    : `Medicine package photo. Return ONLY JSON:
+    : `Medicine package image.
+Return ONLY JSON:
 {
-  "name": "BRAND name printed largest",
+  "name": "BRAND name only",
   "saltName": "full salt with strength",
+  "category": "best category",
   "price": "MRP number",
-  "costPrice": "",
-  "dosage": "pack size e.g. 60ML 1*15",
-  "howToTake": "dosage instructions if visible",
-  "sideEffects": "side effects if mentioned",
-  "manufacturer": "company name on pack",
-  "batchNumber": "batch number printed exactly",
-  "expiryDate": "MM/YYYY only",
+  "dosage": "dosage",
+  "howToTake": "how to take",
+  "sideEffects": "side effects",
+  "manufacturer": "company",
+  "batchNumber": "exact batch e.g. CPT241098",
+  "expiryDate": "MM/YYYY only e.g. 09/2026",
   "requiresPrescription": true or false,
   "stock": 10
 }`;
@@ -132,14 +130,12 @@ router.post("/", async (req, res) => {
         const details = await lookupMedicineDetails(item.name || "", item.saltName || "", apiKey);
         item.category = details.category;
         item.suggestedImageUrl = "";
-        if (!item.manufacturer && details.manufacturer) item.manufacturer = details.manufacturer;
       }
     } else {
       parsed.expiryDate = normalizeDate(parsed.expiryDate || "");
       const details = await lookupMedicineDetails(parsed.name || "", parsed.saltName || "", apiKey);
       parsed.category = details.category;
       parsed.suggestedImageUrl = "";
-      if (!parsed.manufacturer && details.manufacturer) parsed.manufacturer = details.manufacturer;
     }
 
     res.json({ result: parsed });
@@ -162,12 +158,14 @@ router.post("/text", async (req, res) => {
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: "Extract medicines from pharmacy bill. Return only valid JSON array." },
-          { role: "user", content: `Extract all medicines. Return ONLY JSON array:
-[{"name":"BRAND","saltName":"composition","price":"MRP","costPrice":"trade price or empty","stock":10,"category":"","batchNumber":"","expiryDate":"MM/YYYY","manufacturer":"","dosage":"","requiresPrescription":false}]
+          { role: "system", content: "Pharmacy data extraction. Return only valid JSON array." },
+          { role: "user", content: `Extract all medicines from this wholesaler bill. Return ONLY JSON array:
+[{"name":"BRAND","saltName":"salt+strength","price":"number","costPrice":"net value divided by qty","stock":10,"category":"","batchNumber":"","expiryDate":"MM/YYYY","manufacturer":"","dosage":"","requiresPrescription":false}]
 
-Bill:
-${text}` }
+Bill text:
+${text}
+
+Return only the JSON array.` }
         ],
         max_tokens: 1000,
         temperature: 0.1
@@ -187,7 +185,6 @@ ${text}` }
       const details = await lookupMedicineDetails(item.name || "", item.saltName || "", apiKey);
       item.category = details.category;
       item.suggestedImageUrl = "";
-      if (!item.manufacturer && details.manufacturer) item.manufacturer = details.manufacturer;
     }
 
     res.json({ result });
