@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useSignIn } from "@clerk/clerk-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
 
 export default function CustomerLogin() {
-  const { login, user, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
+  const { isLoaded, signIn, setActive } = useSignIn();
   const [, navigate] = useLocation();
   const [form, setForm] = useState({ phone: "", password: "" });
   const [error, setError] = useState("");
@@ -16,17 +17,25 @@ export default function CustomerLogin() {
     }
   }, [user, isLoading]);
 
-  if (isLoading || user) return null;
+  if (isLoading || user || !isLoaded) return null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const res = await api.customerLogin(form);
-      login({ ...res, role: "customer" });
-      navigate("/store");
+      const phone10 = form.phone.replace(/\D/g, "").slice(-10);
+      const result = await signIn.create({
+        identifier: `+91${phone10}`,
+        password: form.password,
+      });
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        navigate("/store");
+      } else {
+        setError("Additional verification required. Please contact support.");
+      }
     } catch (err: any) {
-      setError(err.message);
+      setError(err?.errors?.[0]?.message || "Invalid phone number or password");
     } finally { setLoading(false); }
   };
 
@@ -44,9 +53,12 @@ export default function CustomerLogin() {
           <form onSubmit={submit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <input type="tel" placeholder="e.g. 9876543210" value={form.phone}
-                onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" required />
+              <div className="flex">
+                <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-200 rounded-l-lg text-sm text-gray-600">+91</span>
+                <input type="tel" inputMode="numeric" maxLength={10} placeholder="e.g. 9876543210" value={form.phone}
+                  onChange={e => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
+                  className="flex-1 border border-gray-200 rounded-r-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" required />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>

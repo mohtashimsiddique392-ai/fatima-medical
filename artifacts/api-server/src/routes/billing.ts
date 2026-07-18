@@ -1,54 +1,42 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { Pool } from "pg";
+import { pool } from "@workspace/db";
+import { requirePermission, requireAdmin, signAdminToken } from "../middleware/adminAuth";
 
 const router = Router();
 
-const getPool = () => new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
 // ── Store Settings ──────────────────────────────────────────────
-router.get("/settings", async (_req, res) => {
-  const pool = getPool();
-  try {
-    const { rows } = await pool.query("SELECT * FROM store_settings LIMIT 1");
-    res.json(rows[0] || {});
-  } finally { pool.end(); }
+router.get("/settings", requirePermission("dashboard"), async (_req, res) => {
+  const { rows } = await pool.query("SELECT * FROM store_settings LIMIT 1");
+  res.json(rows[0] || {});
 });
 
-router.put("/settings", async (req, res) => {
-  const pool = getPool();
-  try {
-    const { store_name, address, phone, gstin, gst_enabled, cgst_rate, sgst_rate } = req.body;
-    const { rows } = await pool.query(`
-      UPDATE store_settings SET
-        store_name = COALESCE($1, store_name),
-        address = COALESCE($2, address),
-        phone = COALESCE($3, phone),
-        gstin = $4,
-        gst_enabled = COALESCE($5, gst_enabled),
-        cgst_rate = COALESCE($6, cgst_rate),
-        sgst_rate = COALESCE($7, sgst_rate)
-      WHERE id = (SELECT id FROM store_settings LIMIT 1)
-      RETURNING *
-    `, [store_name, address, phone, gstin, gst_enabled, cgst_rate, sgst_rate]);
-    res.json(rows[0]);
-  } finally { pool.end(); }
+router.put("/settings", requirePermission("dashboard"), async (req, res) => {
+  const { store_name, address, phone, gstin, gst_enabled, cgst_rate, sgst_rate } = req.body;
+  const { rows } = await pool.query(`
+    UPDATE store_settings SET
+      store_name = COALESCE($1, store_name),
+      address = COALESCE($2, address),
+      phone = COALESCE($3, phone),
+      gstin = $4,
+      gst_enabled = COALESCE($5, gst_enabled),
+      cgst_rate = COALESCE($6, cgst_rate),
+      sgst_rate = COALESCE($7, sgst_rate)
+    WHERE id = (SELECT id FROM store_settings LIMIT 1)
+    RETURNING *
+  `, [store_name, address, phone, gstin, gst_enabled, cgst_rate, sgst_rate]);
+  res.json(rows[0]);
 });
 
-// ── Sub-Admins ───────────────────────────────────────────────────
-router.get("/sub-admins", async (_req, res) => {
-  const pool = getPool();
-  try {
-    const { rows } = await pool.query("SELECT id, username, name, phone, permissions, is_active, created_at FROM sub_admins ORDER BY created_at DESC");
-    res.json({ subAdmins: rows });
-  } finally { pool.end(); }
+// ── Sub-Admins (admin only — not manageable by sub-admins themselves) ──
+router.get("/sub-admins", requireAdmin, async (req, res) => {
+  if (req.admin!.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const { rows } = await pool.query("SELECT id, username, name, phone, permissions, is_active, created_at FROM sub_admins ORDER BY created_at DESC");
+  res.json({ subAdmins: rows });
 });
 
-router.post("/sub-admins", async (req, res) => {
-  const pool = getPool();
+router.post("/sub-admins", requireAdmin, async (req, res) => {
+  if (req.admin!.role !== "admin") return res.status(403).json({ error: "Admin only" });
   try {
     const { username, password, name, phone, permissions } = req.body;
     if (!username || !password || !name) return res.status(400).json({ error: "Username, password and name required" });
@@ -61,11 +49,11 @@ router.post("/sub-admins", async (req, res) => {
   } catch (e: any) {
     if (e.code === "23505") return res.status(400).json({ error: "Username already exists" });
     return res.status(500).json({ error: e.message });
-  } finally { pool.end(); }
+  }
 });
 
-router.put("/sub-admins/:id", async (req, res) => {
-  const pool = getPool();
+router.put("/sub-admins/:id", requireAdmin, async (req, res) => {
+  if (req.admin!.role !== "admin") return res.status(403).json({ error: "Admin only" });
   try {
     const { name, phone, permissions, is_active, password } = req.body;
     const id = Number(req.params.id);
@@ -92,85 +80,65 @@ router.put("/sub-admins/:id", async (req, res) => {
     res.json(rows[0]);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
-  } finally { pool.end(); }
+  }
 });
-router.delete("/sub-admins/:id", async (req, res) => {
-  const pool = getPool();
-  try {
-    await pool.query("UPDATE sub_admins SET is_active = false WHERE id = $1", [req.params.id]);
-    res.json({ message: "Sub-admin deactivated" });
-  } finally { pool.end(); }
+
+router.delete("/sub-admins/:id", requireAdmin, async (req, res) => {
+  if (req.admin!.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  await pool.query("UPDATE sub_admins SET is_active = false WHERE id = $1", [req.params.id]);
+  res.json({ message: "Sub-admin deactivated" });
 });
 
 router.post("/sub-admins/login", async (req, res) => {
-  const pool = getPool();
-  try {
-    const { username, password } = req.body;
-    const { rows } = await pool.query("SELECT * FROM sub_admins WHERE username = $1 AND is_active = true", [username]);
-    if (!rows[0]) return res.status(401).json({ error: "Invalid credentials" });
-    const valid = await bcrypt.compare(password, rows[0].password);
-    if (!valid) return res.status(401).json({ error: "Invalid credentials" });
-    const { password: _, ...safe } = rows[0];
-    return res.json({ ...safe, role: "subadmin" });
-  } finally { pool.end(); }
+  const { username, password } = req.body;
+  const { rows } = await pool.query("SELECT * FROM sub_admins WHERE username = $1 AND is_active = true", [username]);
+  if (!rows[0]) return res.status(401).json({ error: "Invalid credentials" });
+  const valid = await bcrypt.compare(password, rows[0].password);
+  if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+  const token = signAdminToken({ sub: rows[0].id, username: rows[0].username, role: "subadmin", permissions: rows[0].permissions });
+  const { password: _pw, ...safe } = rows[0];
+  return res.json({ ...safe, token, role: "subadmin" });
 });
 
-// ── Customer lookup ──────────────────────────────────────────────
-router.get("/customer-lookup", async (req, res) => {
-  const pool = getPool();
-  try {
-    const { phone } = req.query;
-    if (!phone) return res.status(400).json({ error: "Phone required" });
-    const { rows } = await pool.query(
-      "SELECT id, name, phone FROM customers WHERE phone = $1 LIMIT 1",
-      [phone]
-    );
-    if (!rows[0]) return res.status(404).json({ error: "Customer not found" });
-    return res.json(rows[0]);
-  } finally { pool.end(); }
+// ── Customer lookup (for in-store billing) ─────────────────────────
+router.get("/customer-lookup", requirePermission("billing"), async (req, res) => {
+  const { phone } = req.query;
+  if (!phone) return res.status(400).json({ error: "Phone required" });
+  const { rows } = await pool.query("SELECT id, name, phone FROM customers WHERE phone = $1 LIMIT 1", [phone]);
+  if (!rows[0]) return res.status(404).json({ error: "Customer not found" });
+  return res.json(rows[0]);
 });
 
 // ── Bills ────────────────────────────────────────────────────────
-router.get("/bills", async (_req, res) => {
-  const pool = getPool();
-  try {
-    const { rows } = await pool.query("SELECT * FROM bills ORDER BY created_at DESC LIMIT 50");
-    res.json({ bills: rows });
-  } finally { pool.end(); }
+router.get("/bills", requirePermission("billing"), async (_req, res) => {
+  const { rows } = await pool.query("SELECT * FROM bills ORDER BY created_at DESC LIMIT 50");
+  res.json({ bills: rows });
 });
 
-router.get("/bills/:id", async (req, res) => {
-  const pool = getPool();
-  try {
-    const { rows: [bill] } = await pool.query("SELECT * FROM bills WHERE id = $1", [req.params.id]);
-    if (!bill) return res.status(404).json({ error: "Bill not found" });
-    const { rows: items } = await pool.query("SELECT * FROM bill_items WHERE bill_id = $1", [bill.id]);
-    const { rows: [settings] } = await pool.query("SELECT * FROM store_settings LIMIT 1");
-    return res.json({ bill, items, settings });
-  } finally { pool.end(); }
+router.get("/bills/:id", requirePermission("billing"), async (req, res) => {
+  const { rows: [bill] } = await pool.query("SELECT * FROM bills WHERE id = $1", [req.params.id]);
+  if (!bill) return res.status(404).json({ error: "Bill not found" });
+  const { rows: items } = await pool.query("SELECT * FROM bill_items WHERE bill_id = $1", [bill.id]);
+  const { rows: [settings] } = await pool.query("SELECT * FROM store_settings LIMIT 1");
+  return res.json({ bill, items, settings });
 });
 
-router.post("/bills", async (req, res) => {
-  const pool = getPool();
+router.post("/bills", requirePermission("billing"), async (req, res) => {
   try {
     const {
       customer_id, customer_name, customer_phone, customer_address,
       items, subtotal, discount, total_after_discount, gst_amount,
-      final_total, payment_method, notes, created_by
+      final_total, payment_method, notes, created_by,
     } = req.body;
 
     if (!items?.length) return res.status(400).json({ error: "Items required" });
 
-    // Generate bill number: FM-DDMMYYYY-XXX
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, "0");
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const yyyy = now.getFullYear();
     const dateStr = `${dd}${mm}${yyyy}`;
-    const { rows: countRows } = await pool.query(
-      "SELECT COUNT(*) FROM bills WHERE bill_number LIKE $1",
-      [`FM-${dateStr}-%`]
-    );
+    const { rows: countRows } = await pool.query("SELECT COUNT(*) FROM bills WHERE bill_number LIKE $1", [`FM-${dateStr}-%`]);
     const seq = String(Number(countRows[0].count) + 1).padStart(3, "0");
     const bill_number = `FM-${dateStr}-${seq}`;
 
@@ -189,16 +157,16 @@ router.post("/bills", async (req, res) => {
          item.manufacturer || null, item.batch_number || null, item.expiry_date || null,
          item.pack_type || "strip", item.quantity, item.mrp, item.gst_rate || 0, item.amount]
       );
+      if (item.product_id) {
+        await pool.query("UPDATE products SET stock = GREATEST(stock - $1, 0) WHERE id = $2", [item.quantity, item.product_id]);
+      }
     }
 
-    // If app customer, create an in-store order in orders table too
     if (customer_id) {
       const { rows: [order] } = await pool.query(
         `INSERT INTO orders (customer_id, total_amount, payment_method, payment_status, status, address, notes, credits_used)
          VALUES ($1,$2,$3,'paid','delivered',$4,$5,0) RETURNING *`,
-        [customer_id, final_total, payment_method || "cash",
-         customer_address || "In-Store Purchase",
-         `In-Store Bill #${bill_number}`]
+        [customer_id, final_total, payment_method || "cash", customer_address || "In-Store Purchase", `In-Store Bill #${bill_number}`]
       );
       for (const item of items) {
         await pool.query(
@@ -213,9 +181,8 @@ router.post("/bills", async (req, res) => {
     const { rows: allItems } = await pool.query("SELECT * FROM bill_items WHERE bill_id = $1", [bill.id]);
     return res.status(201).json({ bill, items: allItems, settings });
   } catch (e: any) {
-    console.error("Bill error:", e.message);
     return res.status(500).json({ error: e.message });
-  } finally { pool.end(); }
+  }
 });
 
 export default router;

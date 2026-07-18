@@ -1,14 +1,12 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, pool } from "@workspace/db";
 import { ordersTable, orderItemsTable, productsTable, customersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { Pool } from "pg";
+import { requirePermission } from "../middleware/adminAuth";
 
 const router = Router();
-const getPool = () => new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-router.get("/dashboard", async (_req, res) => {
-  const pool = getPool();
+router.get("/dashboard", requirePermission("dashboard"), async (_req, res) => {
   try {
     const orders = await db.select().from(ordersTable);
     const products = await db.select().from(productsTable).where(eq(productsTable.isActive, true));
@@ -62,10 +60,12 @@ router.get("/dashboard", async (_req, res) => {
         netProfit: grossProfit - expiryLoss,
       }
     });
-  } finally { pool.end(); }
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-router.get("/customers", async (_req, res) => {
+router.get("/customers", requirePermission("customers"), async (_req, res) => {
   const customers = await db.select().from(customersTable);
   const result = await Promise.all(customers.map(async (c) => {
     const orders = await db.select().from(ordersTable).where(eq(ordersTable.customerId, c.id));

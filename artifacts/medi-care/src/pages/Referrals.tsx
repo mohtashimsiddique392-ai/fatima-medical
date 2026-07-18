@@ -12,7 +12,7 @@ export default function Referrals() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (user?.id) api.getMyReferral(user.id).then(setInfo);
+    if (user?.id) api.getMyReferral().then(setInfo);
   }, [user?.id]);
 
   const copy = () => {
@@ -26,13 +26,10 @@ export default function Referrals() {
     setMessage("");
     setError("");
     try {
-      const r = await api.applyReferral({
-        customerId: user!.id!,
-        referralCode: applyCode,
-      });
+      const r = await api.applyReferral(applyCode);
       setMessage(r.message);
       setApplyCode("");
-      api.getMyReferral(user!.id!).then(setInfo);
+      api.getMyReferral().then(setInfo);
     } catch (err: any) {
       setError(err.message);
     }

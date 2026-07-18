@@ -5,20 +5,22 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { attachClerk } from "./middleware/customerAuth";
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: { error: "Too many requests, please try again later" }
+  max: 300,
+  message: { error: "Too many requests, please try again later" },
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: { error: "Too many login attempts, please try again in 15 minutes" }
+  message: { error: "Too many login attempts, please try again in 15 minutes" },
 });
 
 const app: Express = express();
+app.set("trust proxy", 1); // required on Vercel so express-rate-limit sees the real client IP
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
   pinoHttp({
@@ -43,6 +45,10 @@ app.use(express.json({ limit: "10mb" }));
 app.use(generalLimiter);
 app.use("/api/auth", authLimiter);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Populates req.auth from a Clerk session token (if the request has one).
+// Individual routes that need a signed-in customer use requireCustomer.
+app.use(attachClerk);
 
 app.use("/api", router);
 

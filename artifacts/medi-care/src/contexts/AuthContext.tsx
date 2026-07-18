@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useUser, useClerk } from "@clerk/clerk-react";
+import { api } from "@/lib/api";
 
 interface User {
   role: "admin" | "customer";
@@ -8,7 +10,9 @@ interface User {
   username?: string;
   referralCode?: string;
   referralCredits?: number;
-  token: string;
+  permissions?: Record<string, boolean>;
+  /** Admin/staff only — a JWT issued by our own API. Customers are authenticated via Clerk instead. */
+  token?: string;
 }
 
 interface CartItem {
@@ -37,55 +41,94 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // isLoading stays true for one render cycle, preventing ProtectedRoute
-  // from redirecting before localStorage has been read.
+  const { isLoaded: clerkLoaded, isSignedIn, user: clerkUser } = useUser();
+  const { signOut } = useClerk();
+
   const [isLoading, setIsLoading] = useState(true);
 
-  const [user, setUser] = useState<User | null>(() => {
-    try { return JSON.parse(localStorage.getItem("mc_user") || "null"); } catch { return null; }
+  // Admin/staff sessions are stored locally (a JWT from our API).
+  // Customer sessions are derived from Clerk + our /customers/me endpoint.
+  const [adminUser, setAdminUser] = useState<User | null>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("mc_user") || "null");
+      return raw?.role === "admin" ? raw : null;
+    } catch { return null; }
   });
+  const [customerUser, setCustomerUser] = useState<User | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     try { return JSON.parse(localStorage.getItem("mc_cart") || "[]"); } catch { return []; }
   });
 
-  // Mark loading done after first render (localStorage is already read above synchronously)
-  useEffect(() => { setIsLoading(false); }, []);
+  // Load the customer profile once Clerk confirms a signed-in session.
+  useEffect(() => {
+    if (!clerkLoaded) return;
+    if (!isSignedIn) { setCustomerUser(null); setIsLoading(false); return; }
+    if (adminUser) { setIsLoading(false); return; } // an admin/staff session takes precedence
 
-  useEffect(() => { localStorage.setItem("mc_user", JSON.stringify(user)); }, [user]);
+    let cancelled = false;
+    api.getMyProfile()
+      .then((profile) => {
+        if (cancelled) return;
+        setCustomerUser({
+          role: "customer",
+          id: profile.id,
+          name: profile.name,
+          phone: profile.phone,
+          referralCode: profile.referralCode,
+          referralCredits: profile.referralCredits,
+        });
+      })
+      .catch(() => { if (!cancelled) setCustomerUser(null); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [clerkLoaded, isSignedIn, clerkUser?.id, adminUser]);
+
+  useEffect(() => {
+    if (clerkLoaded && !isSignedIn) setIsLoading(false);
+  }, [clerkLoaded, isSignedIn]);
+
+  useEffect(() => { localStorage.setItem("mc_user", JSON.stringify(adminUser)); }, [adminUser]);
   useEffect(() => { localStorage.setItem("mc_cart", JSON.stringify(cart)); }, [cart]);
 
-  const login = (u: User) => setUser(u);
+  const user = adminUser || customerUser;
+
+  const login = (u: User) => {
+    // Only admin/staff log in through this function now; customers arrive
+    // via Clerk sign-in and get picked up by the effect above.
+    setAdminUser(u);
+  };
+
   const logout = () => {
-    setUser(null);
+    setAdminUser(null);
+    setCustomerUser(null);
     setCart([]);
     localStorage.removeItem("mc_user");
     localStorage.removeItem("mc_cart");
+    if (isSignedIn) signOut();
   };
 
   const addToCart = (item: Omit<CartItem, "quantity">) => {
-  setCart(prev => {
-    const existing = prev.find(c => c.id === item.id);
-    if (existing) {
-      // Don't exceed available stock
-      const maxStock = item.stock || existing.stock || 999;
-      if (existing.quantity >= maxStock) return prev;
-      return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
-    }
-    return [...prev, { ...item, quantity: 1 }];
-  });
-};
+    setCart(prev => {
+      const existing = prev.find(c => c.id === item.id);
+      if (existing) {
+        const maxStock = item.stock || existing.stock || 999;
+        if (existing.quantity >= maxStock) return prev;
+        return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+      }
+      return [...prev, { ...item, quantity: 1 }];
+    });
+  };
 
   const removeFromCart = (id: number) => setCart(prev => prev.filter(c => c.id !== id));
   const updateQty = (id: number, qty: number) => {
-  if (qty <= 0) return removeFromCart(id);
-  setCart(prev => prev.map(c => {
-    if (c.id !== id) return c;
-    const maxStock = c.stock || 999;
-    const safeQty = Math.min(qty, maxStock);
-    return { ...c, quantity: safeQty };
-  }));
-};
+    if (qty <= 0) return removeFromCart(id);
+    setCart(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const maxStock = c.stock || 999;
+      return { ...c, quantity: Math.min(qty, maxStock) };
+    }));
+  };
   const clearCart = () => setCart([]);
   const cartTotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
   const cartCount = cart.reduce((s, c) => s + c.quantity, 0);

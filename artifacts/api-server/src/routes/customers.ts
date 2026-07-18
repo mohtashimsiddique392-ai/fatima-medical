@@ -1,0 +1,89 @@
+import { Router } from "express";
+import { db, customersTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { getAuth, clerkClient } from "@clerk/express";
+import { requireCustomer } from "../middleware/customerAuth";
+
+const router = Router();
+
+function generateReferralCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+/**
+ * Called by the frontend right after Clerk sign-up (or first sign-in) to
+ * make sure a matching row exists in our own `customers` table, which is
+ * what the rest of the app (orders, referrals, family, health records)
+ * is keyed on.
+ */
+router.post("/sync", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Sign in required" });
+
+  const [existing] = await db.select().from(customersTable).where(eq(customersTable.clerkUserId, userId)).limit(1);
+  if (existing) {
+    return res.json({
+      id: existing.id,
+      name: existing.name,
+      phone: existing.phone,
+      referralCode: existing.referralCode,
+      referralCredits: Number(existing.referralCredits),
+    });
+  }
+
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const phone = clerkUser.phoneNumbers?.[0]?.phoneNumber || req.body.phone;
+  const name = req.body.name || [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "Customer";
+  if (!phone) return res.status(400).json({ error: "Phone number required" });
+
+  const { referralCode: appliedCode } = req.body as { referralCode?: string };
+  let referredById: number | null = null;
+  if (appliedCode) {
+    const [referrer] = await db.select({ id: customersTable.id }).from(customersTable).where(eq(customersTable.referralCode, appliedCode)).limit(1);
+    if (referrer) referredById = referrer.id;
+  }
+
+  let myCode = generateReferralCode();
+  for (let attempts = 0; attempts < 10; attempts++) {
+    const [check] = await db.select({ id: customersTable.id }).from(customersTable).where(eq(customersTable.referralCode, myCode)).limit(1);
+    if (!check) break;
+    myCode = generateReferralCode();
+  }
+
+  const [customer] = await db.insert(customersTable).values({
+    clerkUserId: userId,
+    name,
+    phone,
+    referralCode: myCode,
+    referredBy: referredById,
+    referralCredits: referredById ? "50" : "0",
+  }).returning();
+
+  if (referredById) {
+    await db.update(customersTable)
+      .set({ referralCredits: sql`${customersTable.referralCredits} + 50` })
+      .where(eq(customersTable.id, referredById));
+  }
+
+  return res.json({
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    referralCode: customer.referralCode,
+    referralCredits: Number(customer.referralCredits),
+  });
+});
+
+router.get("/me", requireCustomer, async (req, res) => {
+  const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, req.customerId!)).limit(1);
+  if (!customer) return res.status(404).json({ error: "Not found" });
+  return res.json({
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    referralCode: customer.referralCode,
+    referralCredits: Number(customer.referralCredits),
+  });
+});
+
+export default router;

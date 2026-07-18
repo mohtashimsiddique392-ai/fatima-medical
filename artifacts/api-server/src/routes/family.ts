@@ -1,38 +1,40 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { familyMembersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { requireCustomer } from "../middleware/customerAuth";
 
 const router = Router();
 
-// Get all family members for a customer
-router.get("/", async (req, res) => {
-  const customerId = Number(req.query.customerId);
-  if (!customerId) return res.status(400).json({ error: "customerId required" });
-  const members = await db.select().from(familyMembersTable).where(eq(familyMembersTable.customerId, customerId));
+router.get("/", requireCustomer, async (req, res) => {
+  const members = await db.select().from(familyMembersTable).where(eq(familyMembersTable.customerId, req.customerId!));
   return res.json({ members });
 });
 
-// Add a family member
-router.post("/", async (req, res) => {
-  const { customerId, name, relation, age, bloodGroup, allergies, medicalConditions } = req.body;
-  if (!customerId || !name || !relation) return res.status(400).json({ error: "customerId, name, and relation required" });
-  const [member] = await db.insert(familyMembersTable).values({ customerId, name, relation, age: age || null, bloodGroup: bloodGroup || null, allergies: allergies || null, medicalConditions: medicalConditions || null }).returning();
+router.post("/", requireCustomer, async (req, res) => {
+  const { name, relation, age, bloodGroup, allergies, medicalConditions } = req.body;
+  if (!name || !relation) return res.status(400).json({ error: "name and relation required" });
+  const [member] = await db.insert(familyMembersTable).values({
+    customerId: req.customerId!, name, relation,
+    age: age || null, bloodGroup: bloodGroup || null, allergies: allergies || null, medicalConditions: medicalConditions || null,
+  }).returning();
   return res.json({ member });
 });
 
-// Update a family member
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireCustomer, async (req, res) => {
   const id = Number(req.params.id);
   const { name, relation, age, bloodGroup, allergies, medicalConditions } = req.body;
-  const [member] = await db.update(familyMembersTable).set({ name, relation, age: age || null, bloodGroup: bloodGroup || null, allergies: allergies || null, medicalConditions: medicalConditions || null }).where(eq(familyMembersTable.id, id)).returning();
+  const [member] = await db.update(familyMembersTable)
+    .set({ name, relation, age: age || null, bloodGroup: bloodGroup || null, allergies: allergies || null, medicalConditions: medicalConditions || null })
+    .where(and(eq(familyMembersTable.id, id), eq(familyMembersTable.customerId, req.customerId!)))
+    .returning();
+  if (!member) return res.status(404).json({ error: "Not found" });
   res.json({ member });
 });
 
-// Delete a family member
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireCustomer, async (req, res) => {
   const id = Number(req.params.id);
-  await db.delete(familyMembersTable).where(eq(familyMembersTable.id, id));
+  await db.delete(familyMembersTable).where(and(eq(familyMembersTable.id, id), eq(familyMembersTable.customerId, req.customerId!)));
   res.json({ success: true });
 });
 

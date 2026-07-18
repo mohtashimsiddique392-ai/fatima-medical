@@ -32,12 +32,12 @@ export default function HealthRecords() {
   const loadRecords = (memberId?: string) => {
     if (!user?.id) return;
     const fId = memberId && memberId !== "all" ? Number(memberId) : undefined;
-    api.getHealthRecords(user.id, fId).then(r => { setRecords(r.records); setLoading(false); });
+    api.getHealthRecords(fId).then(r => { setRecords(r.records); setLoading(false); });
   };
 
   useEffect(() => {
     if (!user?.id) return;
-    api.getFamily(user.id).then(r => setMembers(r.members));
+    api.getFamily().then(r => setMembers(r.members));
     loadRecords();
   }, [user?.id]);
 
@@ -51,7 +51,7 @@ export default function HealthRecords() {
     const fId = form.familyMemberId ? Number(form.familyMemberId) : null;
     const memberName = fId ? members.find(m => m.id === fId)?.name : user?.name;
     try {
-      await api.addHealthRecord({ customerId: user!.id, familyMemberId: fId, memberName, type: form.type, value: form.value, unit: getAutoUnit(form.type), notes: form.notes || null, recordedAt: form.recordedAt });
+      await api.addHealthRecord({ familyMemberId: fId, memberName, type: form.type, value: form.value, unit: getAutoUnit(form.type), notes: form.notes || null, recordedAt: form.recordedAt });
       setShowForm(false); loadRecords(selectedMember);
     } finally { setSaving(false); }
   };

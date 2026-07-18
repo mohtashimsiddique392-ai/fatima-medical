@@ -2,6 +2,7 @@ import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wo
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Navbar from "@/components/Navbar";
 import MaintenanceScreen from "@/components/MaintenanceScreen";
@@ -95,9 +96,7 @@ function AppWithMaintenance() {
   const [maintenance, setMaintenance] = useState<{ mode: boolean; message: string } | null>(null);
 
   useEffect(() => {
-    const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
-    fetch(`${BASE}/settings/public`)
-      .then(r => r.json())
+    api.getMaintenanceStatus()
       .then(d => setMaintenance({ mode: d.maintenanceMode, message: d.maintenanceMessage }))
       .catch(() => setMaintenance({ mode: false, message: "" }));
   }, []);

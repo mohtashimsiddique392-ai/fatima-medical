@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { productsTable } from "@workspace/db";
 import { eq, and, isNotNull } from "drizzle-orm";
+import { requirePermission } from "../middleware/adminAuth";
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.get("/categories", async (_req, res) => {
   res.json({ categories: cats });
 });
 
-router.get("/expiry-alerts", async (req, res) => {
+router.get("/expiry-alerts", requirePermission("catalogue"), async (req, res) => {
   const withinDays = Number(req.query.days) || 90;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + withinDays);
@@ -62,7 +63,7 @@ router.get("/:id", async (req, res) => {
   res.json(product);
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requirePermission("catalogue"), async (req, res) => {
   const { name, saltName, description, price, category, imageUrl, stock, dosage, howToTake, sideEffects, requiresPrescription, expiryDate, batchNumber, manufacturer, costPrice } = req.body;
   if (!name || !price || !category) return res.status(400).json({ error: "Name, price, and category required" });
   const [product] = await db.insert(productsTable).values({
@@ -81,7 +82,7 @@ router.post("/", async (req, res) => {
   return res.status(201).json(product);
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requirePermission("catalogue"), async (req, res) => {
   const { name, saltName, description, price, category, imageUrl, stock, dosage, howToTake, sideEffects, requiresPrescription, isActive, expiryDate, batchNumber, manufacturer, costPrice } = req.body;
   const [product] = await db.update(productsTable).set({
     ...(name !== undefined && { name }),
@@ -105,7 +106,7 @@ router.put("/:id", async (req, res) => {
   res.json(product);
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("catalogue"), async (req, res) => {
   await db.update(productsTable).set({ isActive: false }).where(eq(productsTable.id, Number(req.params.id)));
   res.json({ message: "Product deleted" });
 });

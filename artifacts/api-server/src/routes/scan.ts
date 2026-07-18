@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requirePermission } from "../middleware/adminAuth";
 const router = Router();
 
 async function lookupMedicineDetails(name: string, saltName: string, apiKey: string): Promise<{ category: string; imageUrl: string }> {
@@ -63,7 +64,7 @@ function normalizeDate(d: string): string {
   return d;
 }
 
-router.post("/", async (req, res) => {
+router.post("/", requirePermission("catalogue"), async (req, res) => {
   const { image, type } = req.body;
   if (!image) return res.status(400).json({ error: "Image required" });
   const apiKey = process.env.GROQ_API_KEY;
@@ -145,7 +146,7 @@ Return ONLY JSON:
   }
 });
 
-router.post("/text", async (req, res) => {
+router.post("/text", requirePermission("catalogue"), async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "Text required" });
   const apiKey = process.env.GROQ_API_KEY;

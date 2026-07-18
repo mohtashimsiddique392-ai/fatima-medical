@@ -27,7 +27,7 @@ export default function FamilyMembers() {
 
   const load = () => {
     if (!user?.id) return;
-    api.getFamily(user.id).then(r => { setMembers(r.members); setLoading(false); });
+    api.getFamily().then(r => { setMembers(r.members); setLoading(false); });
   };
   useEffect(() => { load(); }, [user?.id]);
 
@@ -41,7 +41,7 @@ export default function FamilyMembers() {
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const payload = { customerId: user!.id, name: form.name, relation: form.relation, age: form.age ? Number(form.age) : null, bloodGroup: form.bloodGroup || null, allergies: form.allergies || null, medicalConditions: form.medicalConditions || null };
+    const payload = { name: form.name, relation: form.relation, age: form.age ? Number(form.age) : null, bloodGroup: form.bloodGroup || null, allergies: form.allergies || null, medicalConditions: form.medicalConditions || null };
     try {
       if (editing) await api.updateFamilyMember(editing.id, payload);
       else await api.addFamilyMember(payload);

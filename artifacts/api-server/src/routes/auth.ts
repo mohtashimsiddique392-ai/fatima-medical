@@ -1,41 +1,22 @@
 import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { customersTable, adminTable } from "@workspace/db";
+import { adminTable, subAdminsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { signAdminToken } from "../middleware/adminAuth";
+import { logger } from "../lib/logger";
 
 const router = Router();
-
-function generateReferralCode(): string {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// In-memory OTP store (for demo; production would use DB)
+// NOTE: Demo-grade OTP store, in-memory. On serverless (Vercel) this resets
+// between cold starts / is not shared across concurrent function instances.
+// It's fine for a low-traffic single-admin store, but for real reliability
+// wire this to a table (or Supabase) + a real SMS provider (Twilio/MSG91).
 const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
-
-// Columns that are safe to select in production (excludes otp/otpExpiresAt added later)
-const adminCols = {
-  id: adminTable.id,
-  username: adminTable.username,
-  password: adminTable.password,
-  phone: adminTable.phone,
-};
-
-// Columns that are safe to select in production (excludes address added later)
-const customerCols = {
-  id: customersTable.id,
-  name: customersTable.name,
-  phone: customersTable.phone,
-  password: customersTable.password,
-  referralCode: customersTable.referralCode,
-  referredBy: customersTable.referredBy,
-  referralCredits: customersTable.referralCredits,
-  createdAt: customersTable.createdAt,
-};
 
 // Admin login
 router.post("/admin/login", async (req, res) => {
@@ -43,24 +24,45 @@ router.post("/admin/login", async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: "Username and password required" });
   }
-  const [admin] = await db.select(adminCols).from(adminTable).where(eq(adminTable.username, username)).limit(1);
+  const [admin] = await db.select().from(adminTable).where(eq(adminTable.username, username)).limit(1);
   if (!admin || !(await bcrypt.compare(password, admin.password))) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
-  const token = Buffer.from(`admin:${username}:${Date.now()}`).toString("base64");
+  const token = signAdminToken({ sub: admin.id, username: admin.username, role: "admin" });
   return res.json({ token, username: admin.username, role: "admin", phone: admin.phone });
+});
+
+// Sub-admin (staff) login
+router.post("/staff/login", async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: "Username and password required" });
+  }
+  const [staff] = await db.select().from(subAdminsTable).where(eq(subAdminsTable.username, username)).limit(1);
+  if (!staff || !staff.isActive || !(await bcrypt.compare(password, staff.password))) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+  const token = signAdminToken({
+    sub: staff.id,
+    username: staff.username,
+    role: "subadmin",
+    permissions: staff.permissions as Record<string, boolean>,
+  });
+  return res.json({ token, username: staff.username, name: staff.name, role: "subadmin", permissions: staff.permissions });
 });
 
 // Admin request OTP for password change
 router.post("/admin/request-otp", async (req, res) => {
   const { username } = req.body;
-  const [admin] = await db.select(adminCols).from(adminTable).where(eq(adminTable.username, username || "fatima04786")).limit(1);
+  const [admin] = await db.select().from(adminTable).where(eq(adminTable.username, username || "fatima04786")).limit(1);
   if (!admin) return res.status(404).json({ error: "Admin not found" });
 
   const otp = generateOtp();
   otpStore[admin.username] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
+  // Server-side only — never return the OTP in the API response.
+  logger.info({ username: admin.username }, `Admin OTP generated: ${otp} (check server logs / wire an SMS provider)`);
 
-  return res.json({ message: `OTP sent to ${admin.phone}. (Demo OTP: ${otp})`, phone: admin.phone });
+  return res.json({ message: `OTP sent to ${admin.phone}.`, phone: admin.phone });
 });
 
 // Admin change password via OTP
@@ -73,73 +75,10 @@ router.post("/admin/change-password", async (req, res) => {
   if (!stored || stored.otp !== otp || stored.expiresAt < Date.now()) {
     return res.status(400).json({ error: "Invalid or expired OTP" });
   }
-  await db.update(adminTable).set({ password: newPassword }).where(eq(adminTable.username, username));
+  const hashed = await bcrypt.hash(newPassword, 10);
+  await db.update(adminTable).set({ password: hashed }).where(eq(adminTable.username, username));
   delete otpStore[username];
   return res.json({ message: "Password changed successfully" });
-});
-
-// Customer register
-router.post("/customer/register", async (req, res) => {
-  const { name, phone, password, referralCode } = req.body;
-  if (!name || !phone || !password) {
-    return res.status(400).json({ error: "Name, phone, and password required" });
-  }
-  const [existing] = await db.select({ id: customersTable.id }).from(customersTable).where(eq(customersTable.phone, phone)).limit(1);
-  if (existing) {
-    return res.status(400).json({ error: "Phone number already registered" });
-  }
-
-  let referredById: number | null = null;
-  if (referralCode) {
-    const [referrer] = await db.select({ id: customersTable.id }).from(customersTable).where(eq(customersTable.referralCode, referralCode)).limit(1);
-    if (referrer) referredById = referrer.id;
-  }
-
-  let myCode = generateReferralCode();
-  let attempts = 0;
-  while (attempts < 10) {
-    const [check] = await db.select({ id: customersTable.id }).from(customersTable).where(eq(customersTable.referralCode, myCode)).limit(1);
-    if (!check) break;
-    myCode = generateReferralCode();
-    attempts++;
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-const [customer] = await db.insert(customersTable).values({
-    name,
-    phone,
-    password: hashedPassword,
-    referralCode: myCode,
-    referredBy: referredById,
-    referralCredits: "0",
-  }).returning({
-    id: customersTable.id,
-    name: customersTable.name,
-    phone: customersTable.phone,
-    referralCode: customersTable.referralCode,
-    referralCredits: customersTable.referralCredits,
-  });
-
-  if (referredById) {
-    await db.execute(`UPDATE customers SET referral_credits = referral_credits + 50 WHERE id = ${referredById}`);
-  }
-
-  const token = Buffer.from(`customer:${customer.id}:${Date.now()}`).toString("base64");
-  return res.json({ token, id: customer.id, name: customer.name, phone: customer.phone, referralCode: customer.referralCode, referralCredits: Number(customer.referralCredits), role: "customer" });
-});
-
-// Customer login
-router.post("/customer/login", async (req, res) => {
-  const { phone, password } = req.body;
-  if (!phone || !password) {
-    return res.status(400).json({ error: "Phone and password required" });
-  }
-  const [customer] = await db.select(customerCols).from(customersTable).where(eq(customersTable.phone, phone)).limit(1);
-  if (!customer || !(await bcrypt.compare(password, customer.password))) {
-    return res.status(401).json({ error: "Invalid phone or password" });
-  }
-  const token = Buffer.from(`customer:${customer.id}:${Date.now()}`).toString("base64");
-  return res.json({ token, id: customer.id, name: customer.name, phone: customer.phone, referralCode: customer.referralCode, referralCredits: Number(customer.referralCredits), role: "customer" });
 });
 
 export default router;

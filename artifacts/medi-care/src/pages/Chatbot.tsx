@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import { Send, Bot, User, ShoppingCart, Stethoscope } from "lucide-react";
 
 interface Message { role: "user" | "bot"; text: string; products?: any[]; }
@@ -28,17 +29,7 @@ export default function Chatbot() {
     const history = messages.slice(1).map(m => ({ role: m.role, text: m.text }));
 
     try {
-      const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
-const res = await fetch(`${BASE}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          customerId: user?.id,
-          history
-        })
-      });
-      const data = await res.json();
+      const data = await api.chat({ message: text, history });
       setMessages(prev => [...prev, { role: "bot", text: data.reply, products: data.suggestedProducts }]);
     } catch {
       setMessages(prev => [...prev, { role: "bot", text: "Sorry, I couldn't connect. Please try again." }]);

@@ -197,7 +197,7 @@ export default function Orders() {
 
   const refreshOrders = () => {
     if (!user?.id) return;
-    api.getOrders({ customerId: user.id }).then(r => { setOrders(r.orders); setLoading(false); });
+    api.getMyOrders().then(r => { setOrders(r.orders); setLoading(false); });
   };
 
   useEffect(() => {

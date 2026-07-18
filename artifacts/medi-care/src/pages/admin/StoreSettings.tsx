@@ -12,9 +12,7 @@ export default function StoreSettings() {
 
   useEffect(() => {
     api.getBillingSettings().then(s => setSettings(s));
-    const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
-    fetch(`${BASE}/settings/public`).then(r => r.json())
-      .then(d => setMaintenance({ enabled: d.maintenanceMode, message: d.maintenanceMessage }));
+    api.getMaintenanceStatus().then(d => setMaintenance({ enabled: d.maintenanceMode, message: d.maintenanceMessage }));
   }, []);
 
   const saveSettings = async (e: React.FormEvent) => {
@@ -26,8 +24,7 @@ export default function StoreSettings() {
   const toggleMaintenance = async () => {
     setSavingMaint(true);
     try {
-      const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
-      await fetch(`${BASE}/settings/maintenance`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !maintenance.enabled, message: maintenance.message }) });
+      await api.updateMaintenanceMode({ enabled: !maintenance.enabled, message: maintenance.message });
       setMaintenance(m => ({ ...m, enabled: !m.enabled }));
       setSavedMaint(true); setTimeout(() => setSavedMaint(false), 2000);
     } finally { setSavingMaint(false); }
@@ -36,8 +33,7 @@ export default function StoreSettings() {
   const saveMaintMessage = async () => {
     setSavingMaint(true);
     try {
-      const BASE = import.meta.env.VITE_API_URL || "https://fatima-medical-api.onrender.com/api";
-      await fetch(`${BASE}/settings/maintenance`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: maintenance.enabled, message: maintenance.message }) });
+      await api.updateMaintenanceMode({ enabled: maintenance.enabled, message: maintenance.message });
       setSavedMaint(true); setTimeout(() => setSavedMaint(false), 2000);
     } finally { setSavingMaint(false); }
   };

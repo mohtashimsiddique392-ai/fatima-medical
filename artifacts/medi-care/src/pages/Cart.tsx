@@ -18,7 +18,6 @@ export default function Cart() {
     setError(""); setLoading(true);
     try {
       await api.createOrder({
-        customerId: user.id,
         items: cart.map(c => ({ productId: c.id, quantity: c.quantity })),
         paymentMethod: form.paymentMethod,
         address: form.address,
