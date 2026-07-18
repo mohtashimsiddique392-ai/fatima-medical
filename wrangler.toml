@@ -1,3 +1,0 @@
-# Cloudflare Pages configuration
-name = "fatima-medical"
-pages_build_output_dir = "artifacts/medi-care/dist/public"
