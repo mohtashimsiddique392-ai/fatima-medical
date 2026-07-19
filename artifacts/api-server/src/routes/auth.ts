@@ -3,8 +3,8 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { adminTable, subAdminsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { signAdminToken } from "../middleware/adminAuth";
-import { logger } from "../lib/logger";
+import { signAdminToken } from "../middleware/adminAuth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 

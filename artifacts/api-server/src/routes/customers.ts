@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, customersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { getAuth, clerkClient } from "@clerk/express";
-import { requireCustomer } from "../middleware/customerAuth";
+import { requireCustomer } from "../middleware/customerAuth.js";
 
 const router = Router();
 

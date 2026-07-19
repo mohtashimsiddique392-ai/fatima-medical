@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
-import { requirePermission } from "../middleware/adminAuth";
+import { requirePermission } from "../middleware/adminAuth.js";
 
 const router = Router();
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requirePermission } from "../middleware/adminAuth";
+import { requirePermission } from "../middleware/adminAuth.js";
 const router = Router();
 
 async function lookupMedicineDetails(name: string, saltName: string, apiKey: string): Promise<{ category: string; imageUrl: string }> {

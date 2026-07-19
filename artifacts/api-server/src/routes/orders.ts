@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
-import { requirePermission } from "../middleware/adminAuth";
-import { requireCustomer } from "../middleware/customerAuth";
+import { requirePermission } from "../middleware/adminAuth.js";
+import { requireCustomer } from "../middleware/customerAuth.js";
 
 const router = Router();
 

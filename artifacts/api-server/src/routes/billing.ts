@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { pool } from "@workspace/db";
-import { requirePermission, requireAdmin, signAdminToken } from "../middleware/adminAuth";
+import { requirePermission, requireAdmin, signAdminToken } from "../middleware/adminAuth.js";
 
 const router = Router();
 
