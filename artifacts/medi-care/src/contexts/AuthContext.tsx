@@ -6,6 +6,7 @@ interface User {
   role: "admin" | "customer";
   id?: number;
   name?: string;
+  email?: string;
   phone?: string;
   username?: string;
   referralCode?: string;
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: "customer",
           id: profile.id,
           name: profile.name,
+          email: profile.email,
           phone: profile.phone,
           referralCode: profile.referralCode,
           referralCredits: profile.referralCredits,

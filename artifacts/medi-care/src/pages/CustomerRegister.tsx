@@ -2,14 +2,14 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useSignUp } from "@clerk/clerk-react";
 import { api } from "@/lib/api";
-import { Smartphone, ShieldCheck, ArrowLeft } from "lucide-react";
+import { Mail, ShieldCheck, ArrowLeft } from "lucide-react";
 
 type Step = "details" | "verify";
 
 export default function CustomerRegister() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const [, navigate] = useLocation();
-  const [form, setForm] = useState({ name: "", phone: "", password: "", confirmPassword: "", referralCode: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirmPassword: "", referralCode: "" });
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -26,7 +26,7 @@ export default function CustomerRegister() {
   const sendOtp = async () => {
     setError(""); setInfo("");
     if (!isLoaded) return;
-    if (!/^\d{10}$/.test(form.phone)) { setError("Enter a valid 10-digit phone number"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { setError("Enter a valid email address"); return; }
     if (form.password.length < 6) { setError("Password must be at least 6 characters"); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
     if (!form.name.trim()) { setError("Enter your full name"); return; }
@@ -34,24 +34,24 @@ export default function CustomerRegister() {
     setLoading(true);
     try {
       await signUp.create({
-        phoneNumber: `+91${form.phone}`,
+        emailAddress: form.email,
         password: form.password,
       });
-      await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setStep("verify");
-      setInfo(`OTP sent via SMS to +91 ${form.phone}. Valid for a few minutes.`);
+      setInfo(`OTP sent to ${form.email}. Check your inbox (and spam folder).`);
       setResendCooldown(30);
     } catch (err: any) {
-      setError(err?.errors?.[0]?.message || "Failed to send OTP");
+      setError(err?.errors?.[0]?.message || "Failed to send verification code");
     } finally { setLoading(false); }
   };
 
   const verifyAndRegister = async () => {
     if (!isLoaded) return;
-    if (!/^\d{4,6}$/.test(otp)) { setError("Enter the OTP you received"); return; }
+    if (!/^\d{4,6}$/.test(otp)) { setError("Enter the code you received"); return; }
     setError(""); setLoading(true);
     try {
-      const result = await signUp.attemptPhoneNumberVerification({ code: otp });
+      const result = await signUp.attemptEmailAddressVerification({ code: otp });
       if (result.status !== "complete") {
         setError("Verification incomplete. Please try again.");
         return;
@@ -60,7 +60,8 @@ export default function CustomerRegister() {
 
       await api.syncCustomer({
         name: form.name,
-        phone: `+91${form.phone}`,
+        email: form.email,
+        phone: form.phone ? `+91${form.phone}` : undefined,
         referralCode: form.referralCode || undefined,
       });
 
@@ -74,11 +75,11 @@ export default function CustomerRegister() {
     if (resendCooldown > 0 || !isLoaded) return;
     setOtp("");
     try {
-      await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setResendCooldown(30);
-      setInfo("OTP re-sent.");
+      setInfo("Code re-sent.");
     } catch (err: any) {
-      setError(err?.errors?.[0]?.message || "Failed to resend OTP");
+      setError(err?.errors?.[0]?.message || "Failed to resend code");
     }
   };
 
@@ -93,11 +94,11 @@ export default function CustomerRegister() {
           <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <ShieldCheck size={26} className="text-teal-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Verify your number</h1>
-          <p className="text-gray-500 text-sm mt-1">We sent a code to <span className="font-medium text-gray-700">+91 {form.phone}</span></p>
+          <h1 className="text-2xl font-bold text-gray-900">Verify your email</h1>
+          <p className="text-gray-500 text-sm mt-1">We sent a code to <span className="font-medium text-gray-700">{form.email}</span></p>
         </div>
         <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-6 space-y-4">
-          <input type="text" inputMode="numeric" maxLength={6} placeholder="Enter OTP"
+          <input type="text" inputMode="numeric" maxLength={6} placeholder="Enter code"
             value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ""))}
             className="w-full border border-gray-200 rounded-lg px-3 py-3 text-center text-2xl tracking-[0.4em] font-semibold focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" />
           {info && !error && <p className="text-teal-700 text-xs bg-teal-50 px-3 py-2 rounded-lg">{info}</p>}
@@ -108,7 +109,7 @@ export default function CustomerRegister() {
           </button>
           <button onClick={resendOtp} disabled={resendCooldown > 0 || loading}
             className="w-full text-sm text-teal-600 hover:text-teal-700 disabled:text-gray-400 py-2">
-            {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"}
+            {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend code"}
           </button>
         </div>
       </div>
@@ -134,12 +135,18 @@ export default function CustomerRegister() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <input type="email" placeholder="you@example.com" value={form.email}
+                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number <span className="text-gray-400 font-normal">(optional, for delivery contact)</span></label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-200 rounded-l-lg text-sm text-gray-600">+91</span>
                 <input type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit phone number" value={form.phone}
                   onChange={e => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
-                  className="flex-1 border border-gray-200 rounded-r-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" required />
+                  className="flex-1 border border-gray-200 rounded-r-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" />
               </div>
             </div>
             <div>
@@ -163,10 +170,9 @@ export default function CustomerRegister() {
             {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
             <button type="submit" disabled={loading || !isLoaded}
               className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-60 text-white py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2">
-              <Smartphone size={16} /> {loading ? "Sending OTP..." : "Send OTP to Verify"}
+              <Mail size={16} /> {loading ? "Sending code..." : "Send Code to Verify"}
             </button>
-            <p className="text-xs text-gray-400 text-center">We'll send a one-time SMS code to verify your number</p>
-            <div id="clerk-captcha" />
+            <p className="text-xs text-gray-400 text-center">We'll email you a one-time code to verify your address</p>
           </form>
           <p className="text-center text-sm text-gray-500 mt-4">
             Already have an account?{" "}

@@ -11,10 +11,10 @@ function generateReferralCode(): string {
 }
 
 /**
- * Called by the frontend right after Clerk sign-up (or first sign-in) to
- * make sure a matching row exists in our own `customers` table, which is
- * what the rest of the app (orders, referrals, family, health records)
- * is keyed on.
+ * Called by the frontend right after Clerk sign-up (email verified via
+ * Clerk's own email OTP) or first sign-in, to make sure a matching row
+ * exists in our own `customers` table, which is what the rest of the app
+ * (orders, referrals, family, health records) is keyed on.
  */
 router.post("/sync", async (req, res) => {
   const { userId } = getAuth(req);
@@ -25,6 +25,7 @@ router.post("/sync", async (req, res) => {
     return res.json({
       id: existing.id,
       name: existing.name,
+      email: existing.email,
       phone: existing.phone,
       referralCode: existing.referralCode,
       referralCredits: Number(existing.referralCredits),
@@ -32,9 +33,10 @@ router.post("/sync", async (req, res) => {
   }
 
   const clerkUser = await clerkClient.users.getUser(userId);
-  const phone = clerkUser.phoneNumbers?.[0]?.phoneNumber || req.body.phone;
+  const email = clerkUser.emailAddresses?.[0]?.emailAddress || req.body.email;
   const name = req.body.name || [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "Customer";
-  if (!phone) return res.status(400).json({ error: "Phone number required" });
+  const phone = req.body.phone || null;
+  if (!email) return res.status(400).json({ error: "Email address required" });
 
   const { referralCode: appliedCode } = req.body as { referralCode?: string };
   let referredById: number | null = null;
@@ -53,6 +55,7 @@ router.post("/sync", async (req, res) => {
   const [customer] = await db.insert(customersTable).values({
     clerkUserId: userId,
     name,
+    email,
     phone,
     referralCode: myCode,
     referredBy: referredById,
@@ -68,6 +71,7 @@ router.post("/sync", async (req, res) => {
   return res.json({
     id: customer.id,
     name: customer.name,
+    email: customer.email,
     phone: customer.phone,
     referralCode: customer.referralCode,
     referralCredits: Number(customer.referralCredits),
@@ -80,6 +84,7 @@ router.get("/me", requireCustomer, async (req, res) => {
   return res.json({
     id: customer.id,
     name: customer.name,
+    email: customer.email,
     phone: customer.phone,
     referralCode: customer.referralCode,
     referralCredits: Number(customer.referralCredits),

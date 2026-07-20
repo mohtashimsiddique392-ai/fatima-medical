@@ -45,7 +45,7 @@ export const api = {
   adminRequestOtp: (body: any) => request<any>("/auth/admin/request-otp", { method: "POST", body: JSON.stringify(body) }),
 
   // ── Customer profile (backed by Clerk; call syncCustomer right after sign-up/sign-in) ──
-  syncCustomer: (body: { name?: string; phone?: string; referralCode?: string }) =>
+  syncCustomer: (body: { name?: string; email?: string; phone?: string; referralCode?: string }) =>
     request<any>("/customers/sync", { method: "POST", body: JSON.stringify(body) }),
   getMyProfile: () => request<any>("/customers/me"),
 

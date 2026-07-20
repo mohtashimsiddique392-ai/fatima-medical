@@ -7,7 +7,7 @@ export default function CustomerLogin() {
   const { user, isLoading } = useAuth();
   const { isLoaded, signIn, setActive } = useSignIn();
   const [, navigate] = useLocation();
-  const [form, setForm] = useState({ phone: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -23,9 +23,8 @@ export default function CustomerLogin() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const phone10 = form.phone.replace(/\D/g, "").slice(-10);
       const result = await signIn.create({
-        identifier: `+91${phone10}`,
+        identifier: form.email,
         password: form.password,
       });
       if (result.status === "complete") {
@@ -35,7 +34,7 @@ export default function CustomerLogin() {
         setError("Additional verification required. Please contact support.");
       }
     } catch (err: any) {
-      setError(err?.errors?.[0]?.message || "Invalid phone number or password");
+      setError(err?.errors?.[0]?.message || "Invalid email or password");
     } finally { setLoading(false); }
   };
 
@@ -52,13 +51,10 @@ export default function CustomerLogin() {
         <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-6">
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <div className="flex">
-                <span className="inline-flex items-center px-3 bg-gray-50 border border-r-0 border-gray-200 rounded-l-lg text-sm text-gray-600">+91</span>
-                <input type="tel" inputMode="numeric" maxLength={10} placeholder="e.g. 9876543210" value={form.phone}
-                  onChange={e => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "") }))}
-                  className="flex-1 border border-gray-200 rounded-r-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" required />
-              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <input type="email" placeholder="you@example.com" value={form.email}
+                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
