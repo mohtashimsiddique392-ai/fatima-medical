@@ -81,7 +81,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           referralCredits: profile.referralCredits,
         });
       })
-      .catch(() => { if (!cancelled) setCustomerUser(null); })
+      .catch(() =>
+        // No matching customers row yet (e.g. the sync call right after
+        // sign-up didn't land). Self-heal by creating it now, using
+        // whatever Clerk already knows about this account.
+        api.syncCustomer({}).then((profile) => {
+          if (cancelled) return;
+          setCustomerUser({
+            role: "customer",
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            phone: profile.phone,
+            referralCode: profile.referralCode,
+            referralCredits: profile.referralCredits,
+          });
+        }).catch(() => { if (!cancelled) setCustomerUser(null); })
+      )
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
   }, [clerkLoaded, isSignedIn, clerkUser?.id, adminUser]);

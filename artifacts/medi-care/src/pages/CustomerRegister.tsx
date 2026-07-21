@@ -1,21 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useSignUp } from "@clerk/clerk-react";
 import { api } from "@/lib/api";
-import { Mail, ShieldCheck, ArrowLeft } from "lucide-react";
+import { Mail, ShieldCheck, ArrowLeft, Check, X } from "lucide-react";
 
 type Step = "details" | "verify";
+
+const PASSWORD_RULES: { label: string; test: (s: string) => boolean }[] = [
+  { label: "At least 8 characters", test: (s) => s.length >= 8 },
+  { label: "One uppercase letter", test: (s) => /[A-Z]/.test(s) },
+  { label: "One lowercase letter", test: (s) => /[a-z]/.test(s) },
+  { label: "One number or symbol", test: (s) => /[0-9!@#$%^&*(),.?":{}|<>_\-+=[\]\\/;'`~]/.test(s) },
+];
+
+function isPasswordValid(pw: string) {
+  return PASSWORD_RULES.every(r => r.test(pw));
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export default function CustomerRegister() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const [, navigate] = useLocation();
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirmPassword: "", referralCode: "" });
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<Step>("details");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const verifyingRef = useRef(false);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -27,7 +44,7 @@ export default function CustomerRegister() {
     setError(""); setInfo("");
     if (!isLoaded) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { setError("Enter a valid email address"); return; }
-    if (form.password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    if (!isPasswordValid(form.password)) { setError("Password doesn't meet all the requirements below"); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match"); return; }
     if (!form.name.trim()) { setError("Enter your full name"); return; }
 
@@ -39,47 +56,65 @@ export default function CustomerRegister() {
       });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setStep("verify");
-      setInfo(`OTP sent to ${form.email}. Check your inbox (and spam folder).`);
-      setResendCooldown(30);
+      setInfo(`Code sent to ${form.email}. Check your inbox (and spam folder).`);
+      setResendCooldown(60);
     } catch (err: any) {
       setError(err?.errors?.[0]?.message || "Failed to send verification code");
     } finally { setLoading(false); }
   };
 
   const verifyAndRegister = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || verifyingRef.current) return; // guard against double-submit (e.g. duplicate mobile tap events)
     if (!/^\d{4,6}$/.test(otp)) { setError("Enter the code you received"); return; }
+    verifyingRef.current = true;
     setError(""); setLoading(true);
     try {
       const result = await signUp.attemptEmailAddressVerification({ code: otp });
-      if (result.status !== "complete") {
+      if (result.status !== "complete" || !result.createdSessionId) {
         setError("Verification incomplete. Please try again.");
         return;
       }
       await setActive({ session: result.createdSessionId });
 
-      await api.syncCustomer({
-        name: form.name,
-        email: form.email,
-        phone: form.phone ? `+91${form.phone}` : undefined,
-        referralCode: form.referralCode || undefined,
-      });
+      // Right after setActive, the session can take a beat to be fully
+      // usable for an authenticated request — retry briefly rather than
+      // leaving the customer stuck with a Clerk account but no store profile.
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          await api.syncCustomer({
+            name: form.name,
+            email: form.email,
+            phone: form.phone ? `+91${form.phone}` : undefined,
+            referralCode: form.referralCode || undefined,
+          });
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e;
+          await sleep(400);
+        }
+      }
+      if (lastErr) throw lastErr;
 
       navigate("/store");
     } catch (err: any) {
-      setError(err?.errors?.[0]?.message || "Verification failed");
-    } finally { setLoading(false); }
+      setError(err?.errors?.[0]?.message || err?.message || "Verification failed");
+    } finally {
+      verifyingRef.current = false;
+      setLoading(false);
+    }
   };
 
   const resendOtp = async () => {
     if (resendCooldown > 0 || !isLoaded) return;
-    setOtp("");
+    setOtp(""); setError("");
     try {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setResendCooldown(30);
+      setResendCooldown(60);
       setInfo("Code re-sent.");
     } catch (err: any) {
-      setError(err?.errors?.[0]?.message || "Failed to resend code");
+      setError(err?.errors?.[0]?.message || "Failed to resend code. Please wait a bit before trying again.");
     }
   };
 
@@ -151,9 +186,23 @@ export default function CustomerRegister() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input type="password" placeholder="Create a password (min 6 chars)" value={form.password}
+              <input type="password" placeholder="Create a password" value={form.password}
+                onFocus={() => setPasswordFocused(true)}
                 onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400" required />
+              {(passwordFocused || form.password.length > 0) && (
+                <ul className="mt-2 space-y-1">
+                  {PASSWORD_RULES.map(rule => {
+                    const met = rule.test(form.password);
+                    return (
+                      <li key={rule.label} className={`flex items-center gap-1.5 text-xs ${met ? "text-teal-600" : "text-gray-400"}`}>
+                        {met ? <Check size={13} /> : <X size={13} />}
+                        {rule.label}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
