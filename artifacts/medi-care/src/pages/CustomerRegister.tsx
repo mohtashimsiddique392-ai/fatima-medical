@@ -6,11 +6,19 @@ import { Mail, ShieldCheck, ArrowLeft, Check, X } from "lucide-react";
 
 type Step = "details" | "verify";
 
+const COMMON_WEAK_PASSWORDS = new Set([
+  "password", "password1", "password123", "123456", "12345678", "123456789",
+  "qwerty", "qwerty123", "abc123", "letmein", "welcome", "welcome1", "admin123",
+  "iloveyou", "monkey", "dragon", "football", "baseball", "master", "sunshine",
+  "princess", "trustno1", "111111", "123123", "1234567890", "changeme",
+]);
+
 const PASSWORD_RULES: { label: string; test: (s: string) => boolean }[] = [
   { label: "At least 8 characters", test: (s) => s.length >= 8 },
   { label: "One uppercase letter", test: (s) => /[A-Z]/.test(s) },
   { label: "One lowercase letter", test: (s) => /[a-z]/.test(s) },
   { label: "One number or symbol", test: (s) => /[0-9!@#$%^&*(),.?":{}|<>_\-+=[\]\\/;'`~]/.test(s) },
+  { label: "Not a commonly used password", test: (s) => !COMMON_WEAK_PASSWORDS.has(s.toLowerCase()) },
 ];
 
 function isPasswordValid(pw: string) {
@@ -50,9 +58,13 @@ export default function CustomerRegister() {
 
     setLoading(true);
     try {
+      const [firstName, ...rest] = form.name.trim().split(/\s+/);
+      const lastName = rest.join(" ") || undefined;
       await signUp.create({
         emailAddress: form.email,
         password: form.password,
+        firstName,
+        lastName,
       });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setStep("verify");
@@ -71,7 +83,12 @@ export default function CustomerRegister() {
     try {
       const result = await signUp.attemptEmailAddressVerification({ code: otp });
       if (result.status !== "complete" || !result.createdSessionId) {
-        setError("Verification incomplete. Please try again.");
+        const missing = (result as any).missingFields?.join(", ");
+        setError(
+          missing
+            ? `Your email is verified, but your account setup needs: ${missing}. Please go back and fill that in, then try again with a fresh code.`
+            : "Verification incomplete. Please try again."
+        );
         return;
       }
       await setActive({ session: result.createdSessionId });
@@ -106,15 +123,27 @@ export default function CustomerRegister() {
     }
   };
 
+  const [resending, setResending] = useState(false);
+
   const resendOtp = async () => {
-    if (resendCooldown > 0 || !isLoaded) return;
-    setOtp(""); setError("");
+    if (resendCooldown > 0 || !isLoaded || resending) return;
+    if (!signUp) {
+      setError("Your session expired. Please go back and start again.");
+      return;
+    }
+    setOtp(""); setError(""); setInfo(""); setResending(true);
     try {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setResendCooldown(60);
-      setInfo("Code re-sent.");
+      setInfo("A new code has been sent — check your inbox and spam folder.");
     } catch (err: any) {
-      setError(err?.errors?.[0]?.message || "Failed to resend code. Please wait a bit before trying again.");
+      setError(
+        err?.errors?.[0]?.message ||
+        err?.message ||
+        "Failed to resend code. Please wait a moment and try again, or go back and restart."
+      );
+    } finally {
+      setResending(false);
     }
   };
 
@@ -142,9 +171,9 @@ export default function CustomerRegister() {
             className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-60 text-white py-3 rounded-lg font-medium text-sm">
             {loading ? "Verifying..." : "Verify & Create Account"}
           </button>
-          <button onClick={resendOtp} disabled={resendCooldown > 0 || loading}
+          <button onClick={resendOtp} disabled={resendCooldown > 0 || loading || resending}
             className="w-full text-sm text-teal-600 hover:text-teal-700 disabled:text-gray-400 py-2">
-            {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend code"}
+            {resending ? "Sending..." : resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend code"}
           </button>
         </div>
       </div>
