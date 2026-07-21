@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { healthRecordsTable, familyMembersTable } from "@workspace/db";
+import { db } from "../../../../lib/db/src/index.js";
+import { healthRecordsTable, familyMembersTable } from "../../../../lib/db/src/index.js";
 import { eq, and, desc } from "drizzle-orm";
 import { requireCustomer } from "../middleware/customerAuth.js";
 

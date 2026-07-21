@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { clerkMiddleware, getAuth } from "@clerk/express";
-import { db, customersTable } from "@workspace/db";
+import { db, customersTable } from "../../../../lib/db/src/index.js";
 import { eq } from "drizzle-orm";
 
 declare global {

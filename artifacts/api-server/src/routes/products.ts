@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { productsTable } from "@workspace/db";
+import { db } from "../../../../lib/db/src/index.js";
+import { productsTable } from "../../../../lib/db/src/index.js";
 import { eq, and, isNotNull } from "drizzle-orm";
 import { requirePermission } from "../middleware/adminAuth.js";
 

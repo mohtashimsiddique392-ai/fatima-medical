@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, pool } from "@workspace/db";
-import { ordersTable, orderItemsTable, productsTable, customersTable } from "@workspace/db";
+import { db, pool } from "../../../../lib/db/src/index.js";
+import { ordersTable, orderItemsTable, productsTable, customersTable } from "../../../../lib/db/src/index.js";
 import { eq } from "drizzle-orm";
 import { requirePermission } from "../middleware/adminAuth.js";
 

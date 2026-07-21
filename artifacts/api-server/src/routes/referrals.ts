@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { customersTable } from "@workspace/db";
+import { db } from "../../../../lib/db/src/index.js";
+import { customersTable } from "../../../../lib/db/src/index.js";
 import { eq, sql } from "drizzle-orm";
 import { requireCustomer } from "../middleware/customerAuth.js";
 

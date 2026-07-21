@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "@workspace/db";
+import { pool } from "../../../../lib/db/src/index.js";
 import { requirePermission } from "../middleware/adminAuth.js";
 import { requireCustomer } from "../middleware/customerAuth.js";
 
