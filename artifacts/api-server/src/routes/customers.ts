@@ -32,11 +32,36 @@ router.post("/sync", async (req, res) => {
     });
   }
 
-  const clerkUser = await clerkClient.users.getUser(userId);
+  let clerkUser;
+  try {
+    clerkUser = await clerkClient.users.getUser(userId);
+  } catch {
+    return res.status(502).json({ error: "Could not verify your account with Clerk. Please try again in a moment." });
+  }
+
   const email = clerkUser.emailAddresses?.[0]?.emailAddress || req.body.email;
   const name = req.body.name || [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "Customer";
   const phone = req.body.phone || null;
   if (!email) return res.status(400).json({ error: "Email address required" });
+
+  // A previous, incomplete registration attempt with this same email may
+  // already have created a customers row (tied to a now-abandoned Clerk
+  // user). If so, adopt it rather than failing on the unique constraint.
+  const [existingByEmail] = await db.select().from(customersTable).where(eq(customersTable.email, email)).limit(1);
+  if (existingByEmail) {
+    const [updated] = await db.update(customersTable)
+      .set({ clerkUserId: userId, name, phone: phone ?? existingByEmail.phone })
+      .where(eq(customersTable.id, existingByEmail.id))
+      .returning();
+    return res.json({
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      phone: updated.phone,
+      referralCode: updated.referralCode,
+      referralCredits: Number(updated.referralCredits),
+    });
+  }
 
   const { referralCode: appliedCode } = req.body as { referralCode?: string };
   let referredById: number | null = null;

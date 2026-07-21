@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { useSignUp } from "@clerk/clerk-react";
+import { useSignUp, useClerk } from "@clerk/clerk-react";
 import { api } from "@/lib/api";
 import { Mail, ShieldCheck, ArrowLeft, Check, X } from "lucide-react";
 
@@ -29,8 +29,15 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function isSessionExistsError(err: any): boolean {
+  const code = err?.errors?.[0]?.code as string | undefined;
+  const message = (err?.errors?.[0]?.message || err?.message || "") as string;
+  return code === "session_exists" || /session.*exist/i.test(message);
+}
+
 export default function CustomerRegister() {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { signOut } = useClerk();
   const [, navigate] = useLocation();
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirmPassword: "", referralCode: "" });
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -59,13 +66,26 @@ export default function CustomerRegister() {
     setLoading(true);
     try {
       const [firstName, ...rest] = form.name.trim().split(/\s+/);
-      const lastName = rest.join(" ") || undefined;
-      await signUp.create({
-        emailAddress: form.email,
-        password: form.password,
-        firstName,
-        lastName,
-      });
+      const lastName = rest.length > 0 ? rest.join(" ") : firstName;
+      try {
+        await signUp.create({
+          emailAddress: form.email,
+          password: form.password,
+          firstName,
+          lastName,
+        });
+      } catch (err: any) {
+        if (!isSessionExistsError(err)) throw err;
+        // A previous attempt left a stuck session/sign-up in this browser.
+        // Clear it and retry cleanly, rather than showing the user a dead end.
+        await signOut();
+        await signUp.create({
+          emailAddress: form.email,
+          password: form.password,
+          firstName,
+          lastName,
+        });
+      }
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setStep("verify");
       setInfo(`Code sent to ${form.email}. Check your inbox (and spam folder).`);
@@ -81,13 +101,22 @@ export default function CustomerRegister() {
     verifyingRef.current = true;
     setError(""); setLoading(true);
     try {
-      const result = await signUp.attemptEmailAddressVerification({ code: otp });
+      let result;
+      try {
+        result = await signUp.attemptEmailAddressVerification({ code: otp });
+      } catch (err: any) {
+        if (!isSessionExistsError(err)) throw err;
+        // A stuck leftover session is blocking this. Clear it and retry the
+        // same code once — the code itself is still valid on Clerk's side.
+        await signOut();
+        result = await signUp.attemptEmailAddressVerification({ code: otp });
+      }
       if (result.status !== "complete" || !result.createdSessionId) {
         const missing = (result as any).missingFields?.join(", ");
         setError(
           missing
-            ? `Your email is verified, but your account setup needs: ${missing}. Please go back and fill that in, then try again with a fresh code.`
-            : "Verification incomplete. Please try again."
+            ? `Your email is verified, but your account setup still needs: ${missing}. Please go back, fill that in, and request a fresh code.`
+            : "Verification incomplete. Please go back and request a fresh code."
         );
         return;
       }

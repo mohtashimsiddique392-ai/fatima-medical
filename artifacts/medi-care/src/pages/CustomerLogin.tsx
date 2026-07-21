@@ -1,11 +1,18 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useSignIn } from "@clerk/clerk-react";
+import { useSignIn, useClerk } from "@clerk/clerk-react";
 import { useAuth } from "@/contexts/AuthContext";
+
+function isSessionExistsError(err: any): boolean {
+  const code = err?.errors?.[0]?.code as string | undefined;
+  const message = (err?.errors?.[0]?.message || err?.message || "") as string;
+  return code === "session_exists" || /session.*exist/i.test(message);
+}
 
 export default function CustomerLogin() {
   const { user, isLoading } = useAuth();
   const { isLoaded, signIn, setActive } = useSignIn();
+  const { signOut } = useClerk();
   const [, navigate] = useLocation();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -23,10 +30,20 @@ export default function CustomerLogin() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const result = await signIn.create({
-        identifier: form.email,
-        password: form.password,
-      });
+      let result;
+      try {
+        result = await signIn.create({
+          identifier: form.email,
+          password: form.password,
+        });
+      } catch (err: any) {
+        if (!isSessionExistsError(err)) throw err;
+        await signOut();
+        result = await signIn.create({
+          identifier: form.email,
+          password: form.password,
+        });
+      }
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         navigate("/store");
