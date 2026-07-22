@@ -68,8 +68,8 @@ function AppRouter() {
         <Route path="/login" component={CustomerLogin} />
         <Route path="/register" component={CustomerRegister} />
         <Route path="/admin-login" component={AdminLogin} />
-        <Route path="/store"><ProtectedCustomer><Store /></ProtectedCustomer></Route>
-        <Route path="/store/product/:id"><ProtectedCustomer><ProductDetail /></ProtectedCustomer></Route>
+        <Route path="/store"><Store /></Route>
+        <Route path="/store/product/:id"><ProductDetail /></Route>
         <Route path="/cart"><Cart /></Route>
         <Route path="/orders"><ProtectedCustomer><Orders /></ProtectedCustomer></Route>
         <Route path="/referrals"><ProtectedCustomer><Referrals /></ProtectedCustomer></Route>
